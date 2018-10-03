@@ -34,9 +34,7 @@ def get_indices(time):
 	# bootstrap
 	return numpy.unique(numpy.random.randint(0, len(time), size=len(time)))
 
-def LC_slopes(time, flux, flux_error):
-	#time = time - time[0] 
-	
+def LC_slopes(time, flux, flux_error, specz, photoz, photoz_error):
 	c0 = numpy.polynomial.chebyshev.Chebyshev((1,0,0))
 	c2 = numpy.polynomial.chebyshev.Chebyshev((0,0,1))
 	
@@ -44,10 +42,19 @@ def LC_slopes(time, flux, flux_error):
 	slopes = []
 	# cross-validate or bootstrap
 	for bs in range(20):
+		if specz == 0:
+			z = 0
+		elif numpy.isfinite(specz):
+			z = specz
+		else:
+			z = numpy.random.normal(photoz, photoz_error)
+		
 		if len(time) > 0:
 		
 			i = get_indices(time)
-			time_bs = time[i]
+			# get subsampled restframe time
+			# at rest frame, more time passed
+			time_bs = time[i] / (1 + z)
 			flux_bs_resampled = numpy.random.normal(flux[i], flux_error[i])
 			flux_bs, flux_error_bs = flux[i], flux_error[i]
 		
@@ -156,6 +163,9 @@ fout.write("\n")
 
 for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	print(object_id)
+	specz = object_data['hostgal_specz'].values[0]
+	photoz = object_data['hostgal_photoz'].values[0]
+	photoz_error = object_data['hostgal_photoz_err'].values[0]
 	all_time = object_data['mjd']
 	all_flux = object_data['flux']
 	all_flux_error = object_data['flux_err']
@@ -171,7 +181,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		time = all_time[mask].values
 		
 		# create features
-		lc_slope_features = LC_slopes(time, flux, flux_error)
+		lc_slope_features = LC_slopes(time, flux, flux_error, specz, photoz, photoz_error)
 		lc_slope_features_all.append(lc_slope_features)
 		
 		#print(lc_slope_features)

@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import os
 import numpy
 import scipy.stats
@@ -43,8 +44,9 @@ def LC_features(time, flux, flux_error):
 #extinction_factors = [0.0092394833, 0.0336530868, 0.0938432007, 0.1868623254, 0.2921024403, 0.4306847762]
 bands = range(6)
 
-a = pandas.read_csv('training_set.csv')
-b = pandas.read_csv('training_set_metadata.csv')
+prefix = sys.argv[1]
+a = pandas.read_csv(prefix + '.csv')
+b = pandas.read_csv(prefix + '_metadata.csv')
 a = a.set_index('object_id')
 b = b.set_index('object_id')
 
@@ -54,23 +56,20 @@ e = a.join(b)
 flux_columns = ['mjd', 'passband', 'flux', 'flux_err', 'detected']
 object_columns = ['ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv', 'target']
 
-fout = open('std_features.txt', 'w')
+fout = open(prefix + '_std_features.txt', 'w')
 fout.write("#")
 for color in 'ugrizY':
-	fout.write("%s_fraclgf, %s_fracrgf, " % (color, color))
+	fout.write("%s_nmeasurements, %s_ngoodmeasurements, %s_goodtimerange, %s_fraclgf, %s_fracrgf, " % (color, color, color, color, color))
 	for c in "variance, skew, kurtosis, iqr, shapiro_wilk, fracabove, LS_period, R21, R31, R01".split(', '):
 		fout.write("%s_%s, " % (color, c))
 fout.write("\n")
 
 for object_id, object_data in e.groupby(e.index.get_level_values(0)):
-	
-	target = object_data['target'].values[0]
-	prefix = '%d' % target
-	
-	print(target, object_id)
+	print(object_id)
 	
 	lc_features_all = []
 	for passband in bands:
+		nmeasurements = (object_data['passband'] == passband).sum()
 		mask = numpy.logical_and(object_data['passband'] == passband, 
 			numpy.logical_and(object_data['flux'] > 0, object_data['detected'] == 1))
 		
@@ -80,6 +79,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		
 		# create features
 		lc_features = LC_features(time, flux, flux_error)
+		lc_features_all += [nmeasurements, len(time), time[-1] - time[0]]
 		lc_features_all += lc_features
 		
 		#print(lc_slope_features)
