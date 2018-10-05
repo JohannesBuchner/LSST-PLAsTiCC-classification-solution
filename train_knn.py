@@ -119,6 +119,7 @@ def train_and_evaluate(name, clf):
 
 for n_components in 40,:
 	print("dimensionality reduction with PCA-%d" % n_components)
+	prefix = 'PCA-%d' % n_components
 	t0 = time()
 	pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True).fit(X)
 	print("done in %0.3fs" % (time() - t0))
@@ -126,25 +127,33 @@ for n_components in 40,:
 	if execute:
 		unknown_white = pca.transform(unknown)
 
-	train_and_evaluate('KNN2', clf = KNeighborsClassifier(n_neighbors=2))
-	train_and_evaluate('KNN4', clf = KNeighborsClassifier(n_neighbors=4))
-	train_and_evaluate('KNN8', clf = KNeighborsClassifier(n_neighbors=8))
+	train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))
+	train_and_evaluate(prefix + 'KNN4', clf = KNeighborsClassifier(n_neighbors=4))
+	train_and_evaluate(prefix + 'KNN10', clf = KNeighborsClassifier(n_neighbors=10))
+	train_and_evaluate(prefix + 'KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 	#train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 	#train_and_evaluate('KNN10-r', clf = KNeighborsClassifier(n_neighbors=10, weights='distance'))
 	#train_and_evaluate('KNN40-r', clf = KNeighborsClassifier(n_neighbors=40, weights='distance'))
 
-	train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4))
-	train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10))
-	train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40))
-	#train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100))
-	#train_and_evaluate('AdaBoost', clf = AdaBoostClassifier(n_estimators=40))
-	#train_and_evaluate('GradientBoosting', clf = GradientBoostingClassifier(n_estimators=40))
-	#train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
+	train_and_evaluate(prefix + 'RandomForest4', clf = RandomForestClassifier(n_estimators=4))
+	train_and_evaluate(prefix + 'RandomForest10', clf = RandomForestClassifier(n_estimators=10))
+	train_and_evaluate(prefix + 'RandomForest40', clf = RandomForestClassifier(n_estimators=40))
+	train_and_evaluate(prefix + 'RandomForest100', clf = RandomForestClassifier(n_estimators=100))
+	train_and_evaluate(prefix + 'RandomForest400', clf = RandomForestClassifier(n_estimators=400))
+	#train_and_evaluate(prefix + 'RandomForest100', clf = RandomForestClassifier(n_estimators=100))
+	#train_and_evaluate(prefix + 'AdaBoost', clf = AdaBoostClassifier(n_estimators=40))
+	#train_and_evaluate(prefix + 'GradientBoosting', clf = GradientBoostingClassifier(n_estimators=40))
+	#train_and_evaluate(prefix + 'ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
 	
-	train_and_evaluate('MLP10', clf = MLPClassifier(hidden_layer_sizes=(10,)))
-	train_and_evaluate('MLP10-20-10', clf = MLPClassifier(hidden_layer_sizes=(10,20,10)))
-	train_and_evaluate('MLP4-16-4', clf = MLPClassifier(hidden_layer_sizes=(4,16,4)))
-	train_and_evaluate('MLP40', clf = MLPClassifier(hidden_layer_sizes=(40,)))
+	train_and_evaluate(prefix + 'MLP10', clf = MLPClassifier(hidden_layer_sizes=(10,)))
+	train_and_evaluate(prefix + 'MLP10-20-10', clf = MLPClassifier(hidden_layer_sizes=(10,20,10)))
+	train_and_evaluate(prefix + 'MLP4-16-4', clf = MLPClassifier(hidden_layer_sizes=(4,16,4)))
+	train_and_evaluate(prefix + 'MLP40', clf = MLPClassifier(hidden_layer_sizes=(40,)))
+
+	train_and_evaluate(prefix + 'SVC-default', clf = SVC(probability=True))
+	train_and_evaluate(prefix + 'SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
+	train_and_evaluate(prefix + 'LinearSVC-default', clf = LinearSVC(probability=True))
+	train_and_evaluate(prefix + 'LinearSVC-0.1', clf = LinearSVC(probability=True, C = 0.1, gamma = 0.05))
 	
 	break
 

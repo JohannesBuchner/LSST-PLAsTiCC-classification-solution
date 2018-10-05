@@ -32,12 +32,12 @@ labels = encoder.classes_
 #N_labels, _ = numpy.histogram(Y_orig, bins=labels)
 N_labels = numpy.array([(Y_orig == l).sum() for l in labels])
 # https://www.kaggle.com/c/PLAsTiCC-2018/discussion/67194
-weights_targets = numpy.ones(len(Y_orig))
-weights_targets[weights_targets == 99] == 2
-weights_targets[weights_targets == 64] == 2
-weights_targets[weights_targets == 15] == 2
+weights_targets = numpy.zeros(100)
 for l, N in zip(labels, N_labels):
-	weights_targets[weights_targets == l] /= N
+	weights_targets[l] = 1./N
+weights_targets[99] *= 2
+weights_targets[64] *= 2
+weights_targets[15] *= 2
 
 #weights_labels = numpy.ones(len(labels))
 #weights_labels[labels == 99] = 2
@@ -67,11 +67,12 @@ def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	y_pred = numpy.clip(y_pred, eps, 1 - eps)
 	y_pred /= y_pred.sum(axis=1)[:, numpy.newaxis]
 	
-	weighting = weights_labels / N_labels
-	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=0)
-	return -(loss * weighting).sum() / weighting.sum()
+	sample_weight = weights_targets[y_true]
+	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=1)
+	return _weighted_sum(loss, sample_weight, normalize)
+	#return -(loss * weighting).sum() / weighting.sum()
 
-scorer = make_scorer(log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels, sample_weight=weights_targets)
+scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
 
 def train_and_evaluate(name, clf):
 	print()
@@ -83,14 +84,14 @@ def train_and_evaluate(name, clf):
 
 	if not execute:
 		# manual masking of one third
-		X_train, X_test, y_train, y_test = train_test_split(X_white, Y, test_size = 0.25, random_state = 21)
+		X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size = 0.25, random_state = 21)
 		clf = clf.fit(X_train, y_train)
 		t0 = time()
 		for i in range(10):
 			y_pred = clf.predict(X_test)
 		
 		#y_scores = clf.predict_proba(X_ts)
-		if hasattr(clf, 'feature_importances_'):
+		if hasattr(clf, 'feature_importances_') and False:
 			importances = clf.feature_importances_
 			indices = numpy.argsort(importances)[::-1]
 			#std = numpy.std([entity.feature_importances_ for entity in clf.estimators_], axis=0)
@@ -134,7 +135,10 @@ def train_and_evaluate(name, clf):
 train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4))
 train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10))
 train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40))
-train_and_evaluate('AdaBoost', clf = AdaBoostClassifier(n_estimators=40))
+#train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
+#train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
+train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100))
+train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400))
 ## too slow
 # train_and_evaluate('GradientBoosting', clf = GradientBoostingClassifier(n_estimators=10)) # extremely slow
 train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
