@@ -15,11 +15,11 @@ from sklearn.linear_model import RidgeClassifier, RidgeClassifierCV, LogisticReg
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.classification import _weighted_sum
 import numpy
-import sys
+import sys, os
 import pandas
 
 training_data_file = 'training_set_all.csv.gz'
-unknown_data_file = 'test_set_part0.csv.gz'
+unknown_data_file = os.environ.get('PREDICT_FILE')
 
 
 encoder = LabelBinarizer()
@@ -31,11 +31,18 @@ encoder.fit(Y_orig)
 labels = encoder.classes_
 #N_labels, _ = numpy.histogram(Y_orig, bins=labels)
 N_labels = numpy.array([(Y_orig == l).sum() for l in labels])
-weights_labels = numpy.ones(len(labels))
 # https://www.kaggle.com/c/PLAsTiCC-2018/discussion/67194
-weights_labels[labels == 99] = 2
-weights_labels[labels == 64] = 2
-weights_labels[labels == 15] = 2
+weights_targets = numpy.zeros(100)
+for l, N in zip(labels, N_labels):
+	weights_targets[l] = 1./N
+weights_targets[99] *= 2
+weights_targets[64] *= 2
+weights_targets[15] *= 2
+
+#weights_labels = numpy.ones(len(labels))
+#weights_labels[labels == 99] = 2
+#weights_labels[labels == 64] = 2
+#weights_labels[labels == 15] = 2
 
 #Y = encoder.fit_transform(Y_orig)
 Y = Y_orig
@@ -45,7 +52,7 @@ X[~numpy.isfinite(X)] = -99
 qt = QuantileTransformer()
 X = qt.fit_transform(X)
 
-execute = True
+execute = unknown_data_file is not None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
 	unknown.pop('object_id')        
@@ -60,11 +67,12 @@ def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	y_pred = numpy.clip(y_pred, eps, 1 - eps)
 	y_pred /= y_pred.sum(axis=1)[:, numpy.newaxis]
 	
-	weighting = weights_labels / N_labels
-	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=0)
-	return -(loss * weighting).sum() / weighting.sum()
+	sample_weight = weights_targets[y_true]
+	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=1)
+	return _weighted_sum(loss, sample_weight, normalize)
+	#return -(loss * weighting).sum() / weighting.sum()
 
-scorer = make_scorer(log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
+scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
 
 def train_and_evaluate(name, clf):
 	print()
@@ -132,6 +140,12 @@ for n_components in 40,:
 	#train_and_evaluate('AdaBoost', clf = AdaBoostClassifier(n_estimators=40))
 	#train_and_evaluate('GradientBoosting', clf = GradientBoostingClassifier(n_estimators=40))
 	#train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
+	
+	train_and_evaluate('MLP10', clf = MLPClassifier(hidden_layer_sizes=(10,)))
+	train_and_evaluate('MLP10-20-10', clf = MLPClassifier(hidden_layer_sizes=(10,20,10)))
+	train_and_evaluate('MLP4-16-4', clf = MLPClassifier(hidden_layer_sizes=(4,16,4)))
+	train_and_evaluate('MLP40', clf = MLPClassifier(hidden_layer_sizes=(40,)))
+	
 	break
 
 
