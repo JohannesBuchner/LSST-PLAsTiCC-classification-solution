@@ -1,54 +1,5 @@
-from time import time
-from sklearn import preprocessing
-from sklearn.preprocessing import quantile_transform, QuantileTransformer
-from sklearn.decomposition import PCA, KernelPCA
-from sklearn.model_selection import train_test_split, cross_val_score, cross_val_predict
-from sklearn.svm import SVC, LinearSVC
-from sklearn.metrics import confusion_matrix, roc_curve
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import log_loss, make_scorer
-from sklearn.preprocessing import LabelBinarizer, MultiLabelBinarizer
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.linear_model import RidgeClassifier, RidgeClassifierCV, LogisticRegression, LogisticRegressionCV
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics.classification import _weighted_sum
-import numpy
-import sys, os
-import pandas
+from alltrain import *
 
-training_data_file = 'training_set_all.csv.gz'
-unknown_data_file = os.environ.get('PREDICT_FILE')
-
-
-encoder = LabelBinarizer()
-train = pandas.read_csv(training_data_file)
-
-train.pop('object_id')
-Y_orig = train.pop('target').values
-encoder.fit(Y_orig)
-labels = encoder.classes_
-#N_labels, _ = numpy.histogram(Y_orig, bins=labels)
-N_labels = numpy.array([(Y_orig == l).sum() for l in labels])
-# https://www.kaggle.com/c/PLAsTiCC-2018/discussion/67194
-weights_targets = numpy.zeros(100)
-for l, N in zip(labels, N_labels):
-	weights_targets[l] = 1./N
-weights_targets[99] *= 2
-weights_targets[64] *= 2
-weights_targets[15] *= 2
-
-#weights_labels = numpy.ones(len(labels))
-#weights_labels[labels == 99] = 2
-#weights_labels[labels == 64] = 2
-#weights_labels[labels == 15] = 2
-
-#Y = encoder.fit_transform(Y_orig)
-Y = Y_orig
-X = train.values
-print('data:', X.shape, Y.shape)
-X[~numpy.isfinite(X)] = -99
 qt = QuantileTransformer()
 X = qt.fit_transform(X)
 
@@ -60,19 +11,6 @@ if execute:
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
 	unknown = qt.transform(unknown)
-
-# not used atm
-def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
-	transformed_labels = encoder.transform(y_true)
-	y_pred = numpy.clip(y_pred, eps, 1 - eps)
-	y_pred /= y_pred.sum(axis=1)[:, numpy.newaxis]
-	
-	sample_weight = weights_targets[y_true]
-	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=1)
-	return _weighted_sum(loss, sample_weight, normalize)
-	#return -(loss * weighting).sum() / weighting.sum()
-
-scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
 
 def train_and_evaluate(name, clf):
 	print()
@@ -132,21 +70,29 @@ def train_and_evaluate(name, clf):
 	return clf
 
 
+train_and_evaluate('KNN2', clf = KNeighborsClassifier(n_neighbors=2))
+train_and_evaluate('KNN4', clf = KNeighborsClassifier(n_neighbors=4))
+train_and_evaluate('KNN10', clf = KNeighborsClassifier(n_neighbors=10))
+train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
+
+train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
+#train_and_evaluate('XGradientBoosting', clf = XGBClassifier(n_estimators=40))
 train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4))
 train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10))
 train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40))
-#train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
-#train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
 train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100))
 train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400))
+#train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
+#train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
 ## too slow
 # train_and_evaluate('GradientBoosting', clf = GradientBoostingClassifier(n_estimators=10)) # extremely slow
-train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
+
 ## can't predict probabilities
 #train_and_evaluate('RidgeClassifier', clf = RidgeClassifier())
+
+## too slow
 #train_and_evaluate('SVC-default', clf = SVC(probability=True))
 #train_and_evaluate('SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
 #train_and_evaluate('LinearSVC-default', clf = LinearSVC(probability=True))
 #train_and_evaluate('LinearSVC-0.1', clf = LinearSVC(probability=True, C = 0.1, gamma = 0.05))
-
 
