@@ -18,7 +18,7 @@ def train_and_evaluate(name, clf):
 	sys.stdout.write('running %s ...\r' % name)
 	sys.stdout.flush()
 	t0 = time()
-	q = cross_val_score(clf, X_white, Y, cv=5, scoring=scorer)
+	q = cross_val_score(clf, X_white, Y, cv=4, scoring=scorer, n_jobs=4)
 	print('%2.2f +- %2.2f %s (training speed: %.1fs)' % (q.mean(), q.std(), name, time() - t0))
 
 	if not execute:
@@ -47,7 +47,7 @@ def train_and_evaluate(name, clf):
 	if execute:
 		t0 = time()
 		print('predictions for training data...')
-		predictions = cross_val_predict(clf, X_white, Y, method='predict_proba')
+		predictions = cross_val_predict(clf, X_white, Y, cv=4, method='predict_proba', n_jobs=4)
 		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
 		clf.fit(X_white, Y)
 		predictions = clf.predict_proba(unknown_white)
