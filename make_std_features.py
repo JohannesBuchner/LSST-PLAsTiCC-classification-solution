@@ -59,9 +59,9 @@ object_columns = ['ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostg
 fout = open(prefix + '_std_features.txt', 'w')
 fout.write("#")
 for color in 'ugrizY':
-	fout.write("%s_nmeasurements, %s_ngoodmeasurements, %s_goodtimerange, %s_fraclgf, %s_fracrgf, " % (color, color, color, color, color))
+	fout.write("%s_nmeasurements,%s_ngoodmeasurements,%s_goodtimerange," % (color, color, color))
 	for c in "variance, skew, kurtosis, iqr, shapiro_wilk, fracabove, LS_period, R21, R31, R01".split(', '):
-		fout.write("%s_%s, " % (color, c))
+		fout.write("%s_%s," % (color, c))
 fout.write("\n")
 
 for object_id, object_data in e.groupby(e.index.get_level_values(0)):

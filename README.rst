@@ -18,6 +18,10 @@ Relatively fast: takes 18 minutes for the 7849 training samples on 1 laptop CPU.
 
 The goal of my approach is to understand the dataset better with relatively blunt tools that still can be understood and interpreted.
 
-I use random forests because I don't like whitening.
+Classification
+------------------
 
+* random forests because I don't like whitening.
+* PCA + K nearest neighbours (K=2, 4, 10, 40, 100)
+* combine predictions with small NN or simple weighting
 
