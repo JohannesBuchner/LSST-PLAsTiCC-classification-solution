@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 from alltrain import *
 
 qt = QuantileTransformer()
@@ -47,11 +48,11 @@ def train_and_evaluate(name, clf):
 		t0 = time()
 		print('predictions for training data...')
 		predictions = cross_val_predict(clf, X_white, Y, method='predict_proba')
-		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',')
+		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
 		clf.fit(X_white, Y)
 		predictions = clf.predict_proba(unknown_white)
 		print('predictions for unknown data...')
-		numpy.savetxt(unknown_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',')
+		numpy.savetxt(unknown_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
 		print('predictions done after %.1fs' % (time() - t0))
 	return clf
 

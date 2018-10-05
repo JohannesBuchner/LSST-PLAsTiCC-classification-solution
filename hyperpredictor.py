@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 from alltrain import *
 
 methods = 'KNN2', 'KNN4', 'RandomForest4'
