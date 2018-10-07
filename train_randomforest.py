@@ -71,10 +71,10 @@ def train_and_evaluate(name, clf):
 	return clf
 
 
-train_and_evaluate('KNN2', clf = KNeighborsClassifier(n_neighbors=2))
-train_and_evaluate('KNN4', clf = KNeighborsClassifier(n_neighbors=4))
-train_and_evaluate('KNN10', clf = KNeighborsClassifier(n_neighbors=10))
-train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
+#train_and_evaluate('KNN2', clf = KNeighborsClassifier(n_neighbors=2))
+#train_and_evaluate('KNN4', clf = KNeighborsClassifier(n_neighbors=4))
+#train_and_evaluate('KNN10', clf = KNeighborsClassifier(n_neighbors=10))
+#train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 
 train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
 #train_and_evaluate('XGradientBoosting', clf = XGBClassifier(n_estimators=40))
