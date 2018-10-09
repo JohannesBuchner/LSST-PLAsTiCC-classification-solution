@@ -1,0 +1,9 @@
+*.txt
+*.gz
+*.csv
+*.fits
+*.pdf
+*.2
+prof
+__pycache__
+*.pyc
