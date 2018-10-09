@@ -10,6 +10,7 @@ X = qt.fit_transform(X)
 
 execute = unknown_data_file is not None
 if execute:
+	print('reading data file to predict ...')
 	unknown = pandas.read_csv(unknown_data_file)
 	unknown_object_ids = unknown.pop('object_id')        
 	unknown = unknown.values                  
@@ -33,7 +34,7 @@ def isolate_with(name, clf):
 		predictions = clf.predict(unknown)
 		i = numpy.where(predictions == -1)[0]
 		print('novel: %d/%d (%.2f%%)' % (len(i), len(unknown), len(i) * 100. / len(unknown)), unknown_object_ids[i])
-		numpy.savetxt(unknown_data_file + '_novel_%s.csv.gz' % name, predictions, delimiter=',')
+		numpy.savetxt(unknown_data_file + '_novel_%s.csv.gz' % name, predictions, delimiter=',', fmt='%d')
 		print('predictions done after %.1fs' % (time() - t0))
 
 

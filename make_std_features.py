@@ -35,6 +35,17 @@ def LC_features(time, flux, flux_error):
 		kurtosis, iqr, shapiro_wilk, fracabove, 
 		LS_period, R21, R31, R01
 	]
+
+	tvariance = time.std()
+	tskew = scipy.stats.skew(time)
+	tkurtosis = scipy.stats.kurtosis(time)
+	tiqr = scipy.stats.iqr(time)
+	
+	features += [
+		tvariance, tskew,
+		tkurtosis, tiqr
+	]
+
 	return features
 
 
@@ -60,7 +71,7 @@ fout = open(prefix + '_std_features.txt', 'w')
 fout.write("#")
 for color in 'ugrizY':
 	fout.write("%s_nmeasurements,%s_ngoodmeasurements,%s_goodtimerange," % (color, color, color))
-	for c in "variance, skew, kurtosis, iqr, shapiro_wilk, fracabove, LS_period, R21, R31, R01".split(', '):
+	for c in "variance, skew, kurtosis, iqr, shapiro_wilk, fracabove, LS_period, R21, R31, R01, tvariance, tskew, tkurtosis, tiqr".split(', '):
 		fout.write("%s_%s," % (color, c))
 fout.write("\n")
 
