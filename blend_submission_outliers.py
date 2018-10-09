@@ -36,7 +36,7 @@ assert (df.object_id == supp_df.object_id).all(), (df.object_id, supp_df.object_
 del supp_df
 w = float(os.environ.get('PRIOR_STRENGTH', '0.0'))
 w_wrongspecz = float(os.environ.get('SPECZERR', '0.01'))
-expo = float(os.environ.get('EXPO', '0.0'))
+expo = float(os.environ.get('EXPO', '1.0'))
 
 outlier_voteweights = {
 	'EllEnvelope':1, 
@@ -49,7 +49,7 @@ nvotes_total = 0
 for outliertechnique in 'EllEnvelope', 'IsolForest':
 	for thresh in 0.001, 0.01, 0.04:
 		print('loading outlier votes of %s[%s] ...' % (outliertechnique, thresh))
-		is_outlier = -1 == numpy.loadtxt('test_set_all_sorted.csv.gz_novel_%s-%s.csv.gz' % (outliertechnique, thresh))
+		is_outlier = -1 == numpy.loadtxt('test_set_all_sorted.csv.gz_novel_%s-%s.csv' % (outliertechnique, thresh))
 		outlier_votes = outlier_votes + is_outlier * outlier_voteweights[outliertechnique]
 		nvotes_total += 1
 

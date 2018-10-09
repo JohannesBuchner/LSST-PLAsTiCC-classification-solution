@@ -34,7 +34,7 @@ def isolate_with(name, clf):
 		predictions = clf.predict(unknown)
 		i = numpy.where(predictions == -1)[0]
 		print('novel: %d/%d (%.2f%%)' % (len(i), len(unknown), len(i) * 100. / len(unknown)), unknown_object_ids[i])
-		numpy.savetxt(unknown_data_file + '_novel_%s.csv.gz' % name, predictions, delimiter=',', fmt='%d')
+		numpy.savetxt(unknown_data_file + '_novel_%s.csv' % name, predictions, delimiter=',', fmt='%d')
 		print('predictions done after %.1fs' % (time() - t0))
 
 
