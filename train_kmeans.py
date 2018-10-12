@@ -64,6 +64,20 @@ def reassign_mapping(name, X, Y, Z, pca, clf):
 		result[mask_test,:] = prob / prob.sum()
 	return result
 
+"""
+
+This technique applies kmeans clustering to the test and training data, 
+partitioning it into groups.
+From the training data samples in each group, the class fractions are inferred.
+One or two outliers are assumed in each group as well.
+
+This forms a simple classifier with few tuning parameters that automatically
+incorporates novelty detection.
+
+It is similar to NearestCentroid classification, but probabilistic.
+
+"""
+
 # parameters
 # flattening of predictor (to even out imbalanced classes) recommended values: 1 - 0.2
 PROB_FLATNESS = float(os.environ.get('PROB_FLATNESS', '0.2'))
