@@ -35,9 +35,6 @@ def get_indices(time):
 	return numpy.unique(numpy.random.randint(0, len(time), size=len(time)))
 
 def LC_slopes(time, flux, flux_error, specz, photoz, photoz_error):
-	c0 = numpy.polynomial.chebyshev.Chebyshev((1,0,0))
-	c2 = numpy.polynomial.chebyshev.Chebyshev((0,0,1))
-	
 	breaktimes = []
 	slopes = []
 	# cross-validate or bootstrap

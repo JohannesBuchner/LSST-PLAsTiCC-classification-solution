@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 from time import time
 from sklearn import preprocessing
-from sklearn.preprocessing import quantile_transform, QuantileTransformer
+from sklearn.preprocessing import quantile_transform, QuantileTransformer, MinMaxScaler, StandardScaler
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.model_selection import train_test_split, cross_val_score, cross_val_predict
 from sklearn.svm import SVC, LinearSVC

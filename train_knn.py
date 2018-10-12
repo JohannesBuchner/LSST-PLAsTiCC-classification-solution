@@ -1,7 +1,18 @@
 from __future__ import print_function, division
 from alltrain import *
 
-qt = QuantileTransformer()
+transform = os.environ.get('TRANSFORM', 'QTU')
+if transform == 'QTU':
+	qt = QuantileTransformer(feature_range=(-1,1))
+elif transform == 'QTN':
+	qt = QuantileTransformer(output_distribution='normal', feature_range=(-1,1))
+elif transform == 'MM':
+	qt = MinMaxScaler(feature_range=(-1,1))
+elif transform == 'NORM'
+	qt = StandardScaler()
+else:
+	assert False, ('unknown transform requested:', transform)
+
 X = qt.fit_transform(X)
 
 execute = unknown_data_file is not None
@@ -58,7 +69,7 @@ def train_and_evaluate(name, clf):
 
 for n_components in 10, 40, 100:
 	print("dimensionality reduction with PCA-%d" % n_components)
-	prefix = 'PCA-%d' % n_components
+	prefix = transform + '-PCA%d-' % n_components
 	t0 = time()
 	pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True).fit(X)
 	print("done in %0.3fs" % (time() - t0))
@@ -66,10 +77,15 @@ for n_components in 10, 40, 100:
 	if execute:
 		unknown_white = pca.transform(unknown)
 
-	#train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))
-	#train_and_evaluate(prefix + 'KNN4', clf = KNeighborsClassifier(n_neighbors=4))
-	#train_and_evaluate(prefix + 'KNN10', clf = KNeighborsClassifier(n_neighbors=10))
-	#train_and_evaluate(prefix + 'KNN40', clf = KNeighborsClassifier(n_neighbors=40))
+
+	train_and_evaluate(prefix + 'NC', clf = NearestCentroid())
+	train_and_evaluate(prefix + 'LDA', clf = LinearDiscriminantAnalysis())
+
+	train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))
+	train_and_evaluate(prefix + 'KNN4', clf = KNeighborsClassifier(n_neighbors=4))
+	train_and_evaluate(prefix + 'KNN10', clf = KNeighborsClassifier(n_neighbors=10))
+	train_and_evaluate(prefix + 'KNN40', clf = KNeighborsClassifier(n_neighbors=40))
+	train_and_evaluate(prefix + 'KNN100', clf = KNeighborsClassifier(n_neighbors=100))
 	#train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 	#train_and_evaluate('KNN10-r', clf = KNeighborsClassifier(n_neighbors=10, weights='distance'))
 	#train_and_evaluate('KNN40-r', clf = KNeighborsClassifier(n_neighbors=40, weights='distance'))
