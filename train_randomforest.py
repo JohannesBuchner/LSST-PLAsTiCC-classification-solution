@@ -85,6 +85,11 @@ train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=
 train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400))
 #train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
 #train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
+
+# TODO:
+# sklearn.discriminant_analysis.LinearDiscriminantAnalysis
+# sklearn.neighbors.NearestCentroid
+
 ## too slow
 # train_and_evaluate('GradientBoosting', clf = GradientBoostingClassifier(n_estimators=10)) # extremely slow
 
@@ -96,4 +101,5 @@ train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=
 #train_and_evaluate('SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
 #train_and_evaluate('LinearSVC-default', clf = LinearSVC(probability=True))
 #train_and_evaluate('LinearSVC-0.1', clf = LinearSVC(probability=True, C = 0.1, gamma = 0.05))
+
 
