@@ -45,7 +45,19 @@ Y = Y_orig
 X = train.values
 X[~numpy.isfinite(X)] = -99
 
-# not used atm
+transform = os.environ.get('TRANSFORM', 'MM')
+if transform == 'QTU':
+	mytransformer = QuantileTransformer(feature_range=(-1,1))
+elif transform == 'QTN':
+	mytransformer = QuantileTransformer(output_distribution='normal', feature_range=(-1,1))
+elif transform == 'MM':
+	mytransformer = MinMaxScaler(feature_range=(-1,1))
+elif transform == 'NORM'
+	mytransformer = StandardScaler()
+else:
+	assert False, ('unknown transform requested:', transform)
+
+
 def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	transformed_labels = encoder.transform(y_true)
 	y_pred = numpy.clip(y_pred, eps, 1 - eps)

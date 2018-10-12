@@ -4,8 +4,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
 X_galmask = train.hostgal_photoz.values == 0
-qt = QuantileTransformer()
-X = qt.fit_transform(X)
+X = mytransformer.fit_transform(X)
 print('gal/exgal:', X_galmask.sum(), (~X_galmask).sum())
 #label_colors = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
@@ -20,7 +19,7 @@ if execute:
 	unknown = unknown.values
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
-	unknown = qt.transform(unknown)
+	unknown = mytransformer.transform(unknown)
 
 def make_transform(name, tsne, X, Y, Z):
 	print()

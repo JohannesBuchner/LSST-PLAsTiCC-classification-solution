@@ -5,18 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
 
-transform = os.environ.get('TRANSFORM', 'QTU')
-if transform == 'QTU':
-	qt = QuantileTransformer(feature_range=(-1,1))
-elif transform == 'QTN':
-	qt = QuantileTransformer(output_distribution='normal', feature_range=(-1,1))
-elif transform == 'MM':
-	qt = MinMaxScaler(feature_range=(-1,1))
-elif transform == 'NORM'
-	qt = StandardScaler()
-else:
-	assert False, ('unknown transform requested:', transform)
-X = qt.fit_transform(X)
+X = mytransformer.fit_transform(X)
 
 execute = unknown_data_file is not None
 if execute:
@@ -26,7 +15,7 @@ if execute:
 	unknown = unknown.values                  
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
-	unknown = qt.transform(unknown)
+	unknown = mytransformer.transform(unknown)
 
 def isolate_with(name, clf):
 	sys.stdout.write('running %s ...\r' % name)

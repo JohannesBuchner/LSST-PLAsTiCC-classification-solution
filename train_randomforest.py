@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 from alltrain import *
 
+# for random forests the transformation should not matter.
 qt = QuantileTransformer()
 X = qt.fit_transform(X)
 
