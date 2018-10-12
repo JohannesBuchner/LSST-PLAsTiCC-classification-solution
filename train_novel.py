@@ -5,14 +5,24 @@ import matplotlib.pyplot as plt
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
 
-qt = QuantileTransformer()
+transform = os.environ.get('TRANSFORM', 'QTU')
+if transform == 'QTU':
+	qt = QuantileTransformer(feature_range=(-1,1))
+elif transform == 'QTN':
+	qt = QuantileTransformer(output_distribution='normal', feature_range=(-1,1))
+elif transform == 'MM':
+	qt = MinMaxScaler(feature_range=(-1,1))
+elif transform == 'NORM'
+	qt = StandardScaler()
+else:
+	assert False, ('unknown transform requested:', transform)
 X = qt.fit_transform(X)
 
 execute = unknown_data_file is not None
 if execute:
 	print('reading data file to predict ...')
 	unknown = pandas.read_csv(unknown_data_file)
-	unknown_object_ids = unknown.pop('object_id')        
+	unknown_object_ids = unknown.pop('object_id')
 	unknown = unknown.values                  
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
@@ -38,10 +48,10 @@ def isolate_with(name, clf):
 		print('predictions done after %.1fs' % (time() - t0))
 
 
-for outlier_fraction in 0.04, 0.01, 0.001:
-	isolate_with('EllEnvelope-%s' % outlier_fraction,
+for outlier_fraction in 0.4, 0.1, 0.04, 0.01, 0.001:
+	isolate_with(transform + '-EllEnvelope-%s' % outlier_fraction,
 		EllipticEnvelope(contamination=outlier_fraction))
-	isolate_with('IsolForest-%s' % outlier_fraction, 
+	isolate_with(transform + '-IsolForest-%s' % outlier_fraction, 
 		IsolationForest(n_estimators=100, contamination=outlier_fraction, behaviour='new'))
 
 
