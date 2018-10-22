@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 Combine classifier predictions with outlier prediction
 
@@ -35,22 +36,22 @@ Ntotal = N.sum()
 
 galmask = data_input.hostgal_photoz == 0
 Ngal = numpy.array([(numpy.logical_and(data_input.target == cl, galmask)).sum() for cl in classes], dtype='f')
-print("gal   classes:  ", numpy.asarray(classes)[Ngal>0], numpy.where(Ngal>0))
+print("gal   classes:  ", numpy.asarray(classes)[Ngal>0].tolist(), numpy.where(Ngal>0)[0].tolist())
 Ngal = flatten(Ngal, flatness)
 Ngal[-1] = Ngal[Ngal>0].min()
 Ntotal_gal = Ngal.sum()
 
 exgalmask = ~galmask
 Nexgal = numpy.array([(numpy.logical_and(data_input.target == cl, exgalmask)).sum() for cl in classes], dtype='f')
-print("exgal classes:  ", numpy.asarray(classes)[Nexgal>0], numpy.where(Nexgal>0))
+print("exgal classes:  ", numpy.asarray(classes)[Nexgal>0].tolist(), numpy.where(Nexgal>0)[0].tolist())
 Nexgal = flatten(Nexgal, flatness)
 Nexgal[-1] = Nexgal[Nexgal>0].min()
 Ntotal_exgal = Nexgal.sum()
 
 print("priors:")
-print("gal:  ", Ngal / Ntotal_gal)
-print("exgal:", Nexgal / Ntotal_exgal)
-print("all:  ", N / Ntotal)
+print("gal:  ", ' '.join(['%.2f' % r for r in Ngal / Ntotal_gal]))
+print("exgal:", ' '.join(['%.2f' % r for r in Nexgal / Ntotal_exgal]))
+print("all:  ", ' '.join(['%.2f' % r for r in N / Ntotal]))
 print()
 
 
@@ -66,19 +67,21 @@ w_wrongspecz = float(os.environ.get('SPECZERR', '0.01'))
 expo = float(os.environ.get('EXPO', '1.0'))
 
 outlier_voteweights = {
-	'EllEnvelope':1, 
-	'IsolForest':1,
+	'NORM-EllEnvelope':1, 
+	'MM-EllEnvelope':1, 
+	'NORM-IsolForest':10,
+	'MM-IsolForest':10,
 }
 outlier_confidence = float(os.environ.get('OUTLIER_CONF', '1.0'))
 
 outlier_votes = 0
 nvotes_total = 0
-for outliertechnique in 'EllEnvelope', 'IsolForest':
+for outliertechnique in 'NORM-EllEnvelope', 'NORM-IsolForest', 'MM-EllEnvelope', 'MM-IsolForest':
 	for thresh in 0.001, 0.01, 0.04, 0.1, 0.4:
 		print('loading outlier votes of %s[%s] ...' % (outliertechnique, thresh))
 		is_outlier = -1 == numpy.loadtxt('test_set_all_sorted.csv.gz_novel_%s-%s.csv' % (outliertechnique, thresh))
 		outlier_votes = outlier_votes + is_outlier * outlier_voteweights[outliertechnique]
-		nvotes_total += 1
+		nvotes_total += outlier_voteweights[outliertechnique]
 
 total_probs = 0
 

@@ -66,7 +66,7 @@ for n_components in 10, 40, 100:
 		unknown_white = pca.transform(unknown)
 
 
-	train_and_evaluate(prefix + 'NC', clf = NearestCentroid())
+	#train_and_evaluate(prefix + 'NC', clf = NearestCentroid())
 	train_and_evaluate(prefix + 'LDA', clf = LinearDiscriminantAnalysis())
 
 	train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))

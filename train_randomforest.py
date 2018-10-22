@@ -2,8 +2,8 @@ from __future__ import print_function, division
 from alltrain import *
 
 # for random forests the transformation should not matter.
-qt = QuantileTransformer()
-X = qt.fit_transform(X)
+#qt = QuantileTransformer()
+#X = qt.fit_transform(X)
 
 execute = unknown_data_file is not None
 if execute:
@@ -12,7 +12,7 @@ if execute:
 	unknown = unknown.values                  
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
-	unknown = qt.transform(unknown)
+	#unknown = qt.transform(unknown)
 
 def train_and_evaluate(name, clf):
 	print()
@@ -72,22 +72,46 @@ def train_and_evaluate(name, clf):
 	return clf
 
 
+if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
+	clf = RandomForestClassifier(n_estimators=100)
+	from sklearn.feature_selection import RFE, RFECV
+	from sklearn.model_selection import StratifiedKFold
+	print("Recursive feature elimination with RandomForest100...")
+	t0 = time()
+	rfe = RFE(estimator=clf, n_features_to_select=40, step=0.1, verbose=2)
+	#rfe = RFECV(estimator=clf, min_features_to_select=10, step=0.1, verbose=2, 
+	#	cv=StratifiedKFold(2), scoring=scorer)
+	rfe.fit(X, Y)
+	print('done after %.1fs' % (time() - t0))
+	print(rfe.grid_scores_)
+
+	indices = numpy.argsort(rfe.ranking_)
+	print("Feature ranking:")
+	fcols = open('important_columns.txt', 'w')
+	for f, index in enumerate(indices):
+		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train.columns[index]))
+		if rfe.ranking_[index] == 1:
+			fcols.write("%d\t%s\n" % (index,train.columns[index]))
+	
+	sys.exit(0)
+
 #train_and_evaluate('KNN2', clf = KNeighborsClassifier(n_neighbors=2))
 #train_and_evaluate('KNN4', clf = KNeighborsClassifier(n_neighbors=4))
 #train_and_evaluate('KNN10', clf = KNeighborsClassifier(n_neighbors=10))
 #train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 
-train_and_evaluate('ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
 #train_and_evaluate('XGradientBoosting', clf = XGBClassifier(n_estimators=40))
 train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4))
 train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10))
 train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40))
 train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100))
 train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400))
-#train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
-#train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
+train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
+train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
+train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40))
 
 # TODO:
+
 # sklearn.discriminant_analysis.LinearDiscriminantAnalysis
 # sklearn.neighbors.NearestCentroid
 

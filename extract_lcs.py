@@ -15,7 +15,9 @@ b = pandas.read_csv('training_set_metadata.csv')
 a = a.set_index('object_id')
 b = b.set_index('object_id')
 
-plt.hist(b.target, bins=numpy.arange(101))
+plt.hist(b.target, bins=numpy.arange(101), histtype='step')
+plt.hist(b.target[b.ddf == 1], bins=numpy.arange(101), histtype='step')
+plt.yscale('log')
 plt.savefig('target_hist.pdf', bbox_inches='tight')
 plt.close()
 
@@ -32,7 +34,8 @@ e = a.join(b)
 targets = defaultdict(list)
 
 for object_id, object_data in e.groupby(e.index.get_level_values(0)):
-	
+	if object_data['ddf'].values[0] == 0:
+		continue
 	target = object_data['target'].values[0]
 	prefix = '%d' % target
 	if len(targets[target]) > 10: 

@@ -65,15 +65,18 @@ def train_and_evaluate(name, tsne):
 n_components = int(os.environ.get('NPCACOMP', '40'))
 perplexity = int(os.environ.get('PERPLEXITY', '30'))
 
-prefix = 'PCA-%d' % n_components
+prefix = transform + '-PCA%d-' % n_components
 print("dimensionality reduction with %s ..." % prefix)
 t0 = time()
-pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True).fit(X)
+pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True)
+X_white = pca.fit_transform(X)
 print("done in %0.3fs" % (time() - t0))
-X_white = pca.transform(X)
+print('PCA Variance ratios:', pca.explained_variance_ratio_)
+#X_white = pca.transform(X)
+del X
 if execute:
 	unknown_white = pca.transform(unknown)
-
+	del unknown
 train_and_evaluate(prefix + 'TSNE%d' % perplexity, tsne = TSNE(perplexity=perplexity, n_iter=5000))
 
 

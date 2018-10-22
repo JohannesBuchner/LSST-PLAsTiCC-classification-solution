@@ -7,7 +7,8 @@ methods = sys.argv[1:]
 
 X = []
 Z = []
-Y = numpy.loadtxt('training_set_target.csv', dtype='i')
+#Y = numpy.loadtxt('resampled_training_set_target.csv', dtype='i')
+Y = Y_orig
 
 for method in methods:
 	print("loading %s ..." % (training_data_file + '_predictions_%s.csv.gz' % method))
@@ -33,8 +34,6 @@ def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	#return -(loss * weighting).sum() / weighting.sum()
 
 scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
-
-
 
 
 t0 = time()

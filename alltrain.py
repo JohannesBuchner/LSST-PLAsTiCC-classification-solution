@@ -13,7 +13,8 @@ from sklearn.metrics import log_loss, make_scorer
 from sklearn.preprocessing import LabelBinarizer, MultiLabelBinarizer
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import RidgeClassifier, RidgeClassifierCV, LogisticRegression, LogisticRegressionCV
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 #from xgboost import XGBClassifier
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics.classification import _weighted_sum
@@ -21,7 +22,7 @@ import numpy
 import sys, os
 import pandas
 
-training_data_file = 'training_set_all.csv.gz'
+training_data_file = os.environ['TRAINING_FILE'] #'training_set_all.csv.gz'
 unknown_data_file = os.environ.get('PREDICT_FILE')
 
 encoder = LabelBinarizer()
@@ -40,6 +41,7 @@ for l, N in zip(labels, N_labels):
 weights_targets[99] *= 2
 weights_targets[64] *= 2
 weights_targets[15] *= 2
+custom_class_weights = numpy.array([weights_targets[l] for l in labels])
 
 Y = Y_orig
 X = train.values
@@ -47,12 +49,12 @@ X[~numpy.isfinite(X)] = -99
 
 transform = os.environ.get('TRANSFORM', 'MM')
 if transform == 'QTU':
-	mytransformer = QuantileTransformer(feature_range=(-1,1))
+	mytransformer = QuantileTransformer()
 elif transform == 'QTN':
-	mytransformer = QuantileTransformer(output_distribution='normal', feature_range=(-1,1))
+	mytransformer = QuantileTransformer(output_distribution='normal')
 elif transform == 'MM':
 	mytransformer = MinMaxScaler(feature_range=(-1,1))
-elif transform == 'NORM'
+elif transform == 'NORM':
 	mytransformer = StandardScaler()
 else:
 	assert False, ('unknown transform requested:', transform)
@@ -68,5 +70,11 @@ def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	return _weighted_sum(loss, sample_weight, normalize)
 	#return -(loss * weighting).sum() / weighting.sum()
 
+from logloss import plasticc_log_loss
+
+scorer = make_scorer(plasticc_log_loss, eps=1e-15, custom_class_weights=custom_class_weights, greater_is_better=False, needs_proba=True, labels=labels)
+
 scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
+
+
 

@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans, AgglomerativeClustering
 X_galmask = train.hostgal_photoz.values == 0
 # remove some columns that we do not want to use
 X = X[:,5:] # RA, DEC, l, b, ddf
+X = X[:,5:] # specz, photoz, photozerr, distmod, mwebv
 
 print('train gal/exgal:', X_galmask.sum(), (~X_galmask).sum())
 #qt = QuantileTransformer(output_distribution='normal')
@@ -19,6 +20,7 @@ if execute:
 	print('test gal/exgal:', unknown_galmask.sum(), (~unknown_galmask).sum())
 	unknown = unknown.values
 	unknown = unknown[:,5:] # remove columns RA, DEC, l, b, ddf
+	unknown = unknown[:,5:] # specz, photoz, photozerr, distmod, mwebv
 	print('unknown:', unknown.shape)
 	unknown[~numpy.isfinite(unknown)] = -99
 	unknown = qt.transform(unknown)
@@ -33,6 +35,7 @@ def reassign_mapping(name, X, Y, Z, pca, clf):
 	XZ = pca.fit_transform(numpy.vstack((X, Z)))
 	print("PCA dimensionality reduction done after %0.3fs" % (time() - t0))
 	del Z, X
+	print('PCA Variance ratios:', pca.explained_variance_ratio_)
 
 	t0 = time()
 	clusters_all = clf.fit_predict(XZ)
@@ -94,7 +97,7 @@ pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True)
 
 for name in [prefix + '-Kmeans%d' % k]:#, prefix + '-HierCluster%d' % k]:
 	if 'Kmeans' in name:
-		clf = MiniBatchKMeans(n_clusters=k)
+		clf = KMeans(n_clusters=k)
 	elif 'HierCluster' in name:
 		clf = AgglomerativeClustering(n_clusters=k, affinity='cosine', linkage='average')
 	else:
@@ -110,7 +113,7 @@ for name in [prefix + '-Kmeans%d' % k]:#, prefix + '-HierCluster%d' % k]:
 	print("storing under '%s' ..." % filename)
 	numpy.savetxt(filename,
 		numpy.hstack((unknown_object_ids.reshape((-1,1)), pred)), 
-		fmt='%d' + ',%.3f' * len(classes),
+		fmt='%d' + ',%.3e' * len(classes),
 		delimiter=',',
 		header='object_id,class_6,class_15,class_16,class_42,class_52,class_53,class_62,class_64,class_65,class_67,class_88,class_90,class_92,class_95,class_99',
 		comments='')

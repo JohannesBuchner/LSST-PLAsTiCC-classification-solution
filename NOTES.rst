@@ -41,6 +41,9 @@ a = a.calculateFeature(lc)
 Classes
 ---------
 
+galactic:   6 16 53 65 92
+exgalactic: 15 42 52 62 64 67 88 90 95 
+
 with extract_lcs.py
 
 6: shape extremely close to two powerlaws slope
@@ -50,10 +53,37 @@ with extract_lcs.py
 52: similar to SN, but short visibility, very flat. Faint. Novae?
 53: strongly periodic, almost sinosoidal.
 62: SN powerlaws, but has smoother bend
+64: few examples. brief. very steep decline
+65: very sporadic peaks, lots of scatter. negative flux-time slope. inverted or very flat SED? AGN? no, galactic
 67: has negative bend
 88: multiple peaks, lots of structure/scatter. Exists for longer
 90: SN again, bending
+92: similar to 16, quite blue SED
 95: bending SN with late break/plateau
+
+SN-like:
+6: falls and rises with same speed in all bands
+15: diversity in fall/rise slopes across bands
+42: rising slope is steep in UV flatter in IR
+62: falling slope flatter in general (except UV)
+90: falling slope flatter in general (except IR)
+95: falling slope flatter in general (except UV)
+52: differs from 42 in flux-time slopes
+
+6: rising optical, UV enhanced, IR decrease
+15: declining in optical, very strong UV
+42: flat to strongly increasing in optical. IR decrease
+62: optical increasing, UV excess. IR decrease
+67: 
+90: opt increasing. UV excess. IR decrease
+95: opt increasing. UV excess. IR flat or decrease.
+
+galactic:
+6: two powerlaws of same slope, T const, 
+16: differs in 15 in slopes, Temp, blueratio of avg SED, #dips, #peaks
+53: has different skew than 16
+65:
+92:
 
 
 
