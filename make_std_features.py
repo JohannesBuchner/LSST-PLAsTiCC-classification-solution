@@ -14,6 +14,20 @@ def make_runstats(mask):
 	runlengths = runs_of_ones(mask)
 	return numpy.mean(runlengths), numpy.std(runlengths)
 
+def get_standard_stats(mag):
+	if len(mag) == 0:
+		return [numpy.nan]*5
+	elif len(mag) == 1:
+		medianmag = numpy.median(mag)
+		return [medianmag, 0.0, 0.0, -3.0, 0.0]
+	else:
+		medianmag = numpy.median(mag)
+		variance = mag.std()
+		skew = scipy.stats.skew(mag) if len(mag) > 2 else 0.0
+		kurtosis = scipy.stats.kurtosis(mag)
+		iqr = scipy.stats.iqr(mag)
+		return [medianmag, variance, skew, kurtosis, iqr]
+
 def LC_features(time, flux, flux_error):
 	nmeasurements = len(time)
 	totaltimedetected = time[-1] - time[0] if len(time) > 1 else 0
@@ -22,11 +36,9 @@ def LC_features(time, flux, flux_error):
 	mag = numpy.log10(flux) * 0.4
 	#lc = numpy.array([mag, time])
 	maxmag = numpy.max(mag) if len(mag) > 0 else numpy.nan
-	medianmag = numpy.median(mag)
-	variance = mag.std()
-	skew = scipy.stats.skew(mag)
-	kurtosis = scipy.stats.kurtosis(mag)
-	iqr = scipy.stats.iqr(mag)
+	
+	medianmag, variance, skew, kurtosis, iqr = get_standard_stats(mag)
+	
 	fracabove = (mag > mag.mean()).mean()
 	if len(mag) < 3:
 		shapiro_wilk, _p_value = numpy.nan, numpy.nan
@@ -57,31 +69,14 @@ def LC_features(time, flux, flux_error):
 		LS_period, R21, R31, R01
 	]
 	
-	tvariance = time.std()
-	tskew = scipy.stats.skew(time)
-	tkurtosis = scipy.stats.kurtosis(time)
-	tiqr = scipy.stats.iqr(time)
+	features += get_standard_stats(time)[1:] # skipping median time
 	
 	deltat = time[1:] - time[:-1]
-	dtmedian = numpy.median(deltat)
-	dtvariance = deltat.std()
-	dtskew = scipy.stats.skew(deltat)
-	dtkurtosis = scipy.stats.kurtosis(deltat)
-	dtiqr = scipy.stats.iqr(deltat)
+	features += get_standard_stats(deltat)
 	
 	slopes = (mag[1:] - mag[:-1]) / (time[1:] - time[:-1])
-	dsmedian = numpy.median(slopes)
-	dsvariance = slopes.std()
-	dsskew = scipy.stats.skew(slopes)
-	dskurtosis = scipy.stats.kurtosis(slopes)
-	dsiqr = scipy.stats.iqr(slopes)
+	features += get_standard_stats(slopes)
 	
-	features += [
-		tvariance, tskew, tkurtosis, tiqr,
-		dtmedian, dtvariance, dtskew, dtkurtosis, dtiqr,
-		dsmedian, dsvariance, dsskew, dskurtosis, dsiqr,
-	]
-
 	# count dips: where the flux is lower than earlier and later
 	mask_left_down  = flux[1:-1] + flux_error[1:-1] < (flux[0:-2] - flux_error[0:-2]) * 0.8
 	mask_right_up   = flux[1:-1] + flux_error[1:-1] < (flux[2:]   - flux_error[2:]  ) * 0.8
@@ -104,19 +99,9 @@ def LC_features(time, flux, flux_error):
 	
 	# slopes before and after peak
 	i = numpy.argmax(flux) if len(flux) > 0 else 0
-	dsmedian = numpy.median(slopes[:i+1])
-	dsvariance = slopes[:i+1].std()
-	dsskew = scipy.stats.skew(slopes[:i+1])
-	dskurtosis = scipy.stats.kurtosis(slopes[:i+1])
-	dsiqr = scipy.stats.iqr(slopes[:i+1])
-	features += [dsmedian, dsvariance, dsskew, dskurtosis, dsiqr]
-	dsmedian = numpy.median(slopes[i:])
-	dsvariance = slopes[i:].std()
-	dsskew = scipy.stats.skew(slopes[i:])
-	dskurtosis = scipy.stats.kurtosis(slopes[i:])
-	dsiqr = scipy.stats.iqr(slopes[i:])
-	features += [dsmedian, dsvariance, dsskew, dskurtosis, dsiqr]
-
+	features += get_standard_stats(slopes[:i+1])
+	features += get_standard_stats(slopes[i:])
+	
 	return features
 
 
@@ -133,7 +118,15 @@ print("processing...")
 a = a.set_index('object_id')
 b = b.set_index('object_id')
 
+# slim down table
+for col in 'ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv', 'target':
+	try:
+		b.pop(col)
+	except KeyError:
+		pass
+
 e = a.join(b)
+del a, b
 
 # columns:
 flux_columns = ['mjd', 'passband', 'flux', 'flux_err', 'detected']
@@ -169,33 +162,35 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	print(object_id)
 	
 	allavgdetrun = []
-	allnmeasurements = len(object_data)
-	was_detected = numpy.logical_and(object_data['flux'] > 0, object_data['detected'] == 1)
-	allgoodmeasurements = was_detected.sum()
+	all_detected = object_data['detected'].values == 1
 	all_time = object_data['mjd'].values
-	if was_detected:
+	all_fluxes = object_data['flux'].values
+	all_flux_errors = object_data['flux_err'].values
+	all_passbands = object_data['passband'].values
+	
+	allnmeasurements = len(all_fluxes)
+	was_detected = numpy.logical_and(all_fluxes > 0, all_detected)
+	allgoodmeasurements = was_detected.sum()
+	if allgoodmeasurements > 0:
 		alltimerange = all_time[was_detected].max() - all_time[was_detected].min()
 	else:
 		alltimerange = 0
+	
 	lc_features_all = []
 	for passband in bands:
-		nmeasurements = (object_data['passband'] == passband).sum()
-		mask = object_data['passband'] == passband
-		time = object_data['mjd'][mask].values
-		flux = object_data['flux'][mask].values
-		flux_error = object_data['flux_err'][mask].values
-		was_detected = numpy.logical_and(object_data['flux'][mask] > 0, object_data['detected'][mask] == 1)
+		mask = all_passbands == passband
+		
+		nmeasurements = mask.sum()
+		was_detected_run = was_detected[mask]
 		# remove non-detections in beginning and end
-		was_detected = numpy.trim_zeros(was_detected)
-		avgdetrun, stddetrun = make_runstats(was_detected)
+		was_detected_run = numpy.trim_zeros(was_detected_run)
+		avgdetrun, stddetrun = make_runstats(was_detected_run)
 		allavgdetrun.append(avgdetrun)
 
-		mask = numpy.logical_and(object_data['passband'] == passband, 
-			numpy.logical_and(object_data['flux'] > 0, object_data['detected'] == 1))
-		
-		flux = object_data['flux'][mask].values
-		flux_error = object_data['flux_err'][mask].values
-		time = object_data['mjd'][mask].values
+		mask = numpy.logical_and(mask, was_detected)
+		time = all_time[mask]
+		flux = all_fluxes[mask]
+		flux_error = all_flux_errors[mask]
 		
 		# create features
 		lc_features = LC_features(time, flux, flux_error)

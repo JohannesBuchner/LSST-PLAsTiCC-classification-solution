@@ -23,6 +23,8 @@ def compute_concavity(x, y, yerr, ymodel):
 	return excess_variance, concavity
 
 def LC_slope_singlefit(time, flux, flux_error, z):
+	if not numpy.isfinite(z):
+		return [numpy.nan]*4
 	# get subsampled restframe time
 	# at rest frame, more time passed
 	time_bs = time / (1 + z)
@@ -122,6 +124,8 @@ Tmax = 10000
 
 Twave_grid = numpy.logspace(2, 4, 40).reshape((-1,1))
 def bbody_fit(wave, flux):
+	if not numpy.isfinite(wave).all():
+		return [numpy.nan]*4
 	chi2best = 1e300
 	best = None
 	flux_error = 1
@@ -146,13 +150,13 @@ def bbody_fit(wave, flux):
 	
 	return best + [slope, chi2best - chi2_PL]
 
-def fit_logline(time, flux, flux_error):
-	x, y, y_err = time, log10(flux), log10(flux_error)
-	slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-	excess_variance, concavity = compute_concavity(time, flux, flux_error, ymodel=10**(slope * x + intercept))
-
-	t = numpy.linspace(x[0], x[-1], 400)
-	return [slope, intercept, excess_variance, concavity]
+#def fit_logline(time, flux, flux_error):
+#	x, y, y_err = time, log10(flux), log10(flux_error)
+#	slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+#	excess_variance, concavity = compute_concavity(time, flux, flux_error, ymodel=10**(slope * x + intercept))
+#
+#	t = numpy.linspace(x[0], x[-1], 400)
+#	return [slope, intercept, excess_variance, concavity]
 
 def get_indices(time):
 	# bootstrap
@@ -168,7 +172,7 @@ def LC_slopes(time, flux, flux_error, specz, photoz, photoz_error):
 		elif numpy.isfinite(specz):
 			z = specz
 		else:
-			z = numpy.random.normal(photoz, photoz_error)
+			z = sample_photoz(photoz, photoz_error)
 		
 		if len(time) > 0:
 		
@@ -215,33 +219,27 @@ def LC_slopes(time, flux, flux_error, specz, photoz, photoz_error):
 	#	print()
 	
 	slopes = numpy.asarray(slopes)
-	goodl = slopes[:,2] > 2
-	goodr = slopes[:,2+4] > 2
+	#goodl = slopes[:,2] > 2
+	#goodr = slopes[:,2+4] > 2
 	
 	# features:
-	# fraction of left good fits
-	# fraction of right good fits
-	# (for each of the following: 25%, 50%, 75% quartiles)
-	# left poor fits slope 
-	# left good fits slope
-	# left poor fits concavity 
-	# left good fits concavity
-	# right poor fits slope 
-	# right good fits slope
-	# right poor fits concavity 
-	# right good fits concavity
+	# (for each of the following: median and iqr)
+	# left fits slope
 	# left fits variance
+	# left fits concavity
+	# right fits slope
 	# right fits variance
-	# peak flux
+	# right fits concavity
 	# peak flux loglinear interpolated
 	results = []
-	results += [goodl.mean(), goodr.mean()]
-	for v in slopes[goodl,0], slopes[~goodl,0], slopes[goodl,3], slopes[~goodl,3], slopes[goodr,0+4], slopes[~goodr,0+4], slopes[goodr,3+4], slopes[~goodr,3+4], slopes[:,2], slopes[:,4], slopes[:,8], slopes[:,9]:
+	results += []
+	for v in slopes[:,0], slopes[:,2], slopes[:,3], slopes[:,0+4], slopes[:,2+4], slopes[:,3+4], slopes[:,9]:
 		vmask = numpy.isfinite(v)
 		if vmask.any():
-			results += scipy.stats.mstats.mquantiles(v[vmask], [0.25, 0.5, 0.75]).tolist()
+			#results += scipy.stats.mstats.mquantiles(v[vmask], [0.25, 0.5, 0.75]).tolist()
+			results += [numpy.median(v[vmask]), scipy.stats.iqr(v[vmask])]
 		else:
-			results += [-99,-99,-99]
+			results += [numpy.nan,numpy.nan]
 	return results
 
 ## ugrizY EBV effect, assuming a flat spectrum
@@ -262,43 +260,70 @@ b = pandas.read_csv(prefix + '_metadata.csv')
 a = a.set_index('object_id')
 b = b.set_index('object_id')
 
+# slim down table
+for col in 'ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'distmod', 'mwebv', 'target':
+	try:
+		b.pop(col)
+	except KeyError:
+		pass
+
 e = a.join(b)
 
 # columns:
 flux_columns = ['mjd', 'passband', 'flux', 'flux_err', 'detected']
 object_columns = ['ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv', 'target']
 
-fout = open(prefix + '_colorslope_features.txt', 'w')
-# left poor fits slope 
-# left good fits slope
-# left poor fits concavity 
-# left good fits concavity
-# right poor fits slope 
-# right good fits slope
-# right poor fits concavity 
-# right good fits concavity
-# left fits variance
-# right fits variance
-# peak flux
-# peak flux loglinear interpolated
+mask = b.hostgal_specz > 0
+specz = b.hostgal_specz[mask].values
+photoz = b.hostgal_photoz[mask].values
+del a, b
 
-header = "#"
+Nz = 15
+zindex = (numpy.log10(photoz+1) * Nz / 0.5).astype(int)
+zindex[zindex <  0] = 0
+zindex[zindex > Nz-1] = Nz-1
+zdists = [[] for i in range(Nz)]
+for zi, speczi in zip(zindex, specz):
+	zdists[zi].append(speczi)
+zdists = [numpy.sort(zdist) for zdist in zdists]
+print('zdists:', [len(zdist) for zdist in zdists])
+
+def sample_photoz(photozi, photozi_err, Nsamples=None):
+	# original:
+	# return numpy.random.normal(photozi, photozi_err, size=Nsamples)
+	# draw from empirical distribution
+	zindexi = numpy.log10(photozi+1) * Nz / 0.5
+	if not zindexi > 0:
+		zindexi = 0
+	zindexi = min(Nz-1, int(zindexi))
+	zdist = zdists[zindexi]
+	if len(zdist) < 5:
+		return numpy.random.normal(photozi, photozi_err, size=Nsamples)
+	else:
+		return numpy.random.choice(zdist, replace=True, size=Nsamples)
+	
+
+fout = open(prefix + '_colorslope_features.txt', 'w')
+header = ""
 for color in 'ugrizY':
-	header += "%s_fraclgf, %s_fracrgf, " % (color, color)
-	for c in "lpfslope, lgfslope, lpfconc, lgfconc, rpfslope, rgfslope, rpfcconc, rgfconc, lfvar, rfvar, peakflux, peakfluxi".split(', '):
-		header += "%s_%s_25,%s_%s_50,%s_%s_75," % (color, c, color, c, color, c)
+	for c in "leftslope, leftvar, leftconc, rightslope, rightvar, rightconc, peakfluxi".split(', '):
+		header += "%s_%s_median,%s_%s_iqr," % (color, c, color, c)
 	header += "%s_peakcolor,%s_peakcolori," % (color, color)
 columns = """
 redrise, redfall,
 bluerise, bluefall,
 phi_rise, theta_rise, evolrise,
+phi_rise_alt, theta_rise_alt, evolrise_alt,
 phi_fall, theta_fall, evolfall,
+phi_fall_alt, theta_fall_alt, evolfall_alt,
 Twave, flux400,
-Trise, Tfall, Tratio
+Twave_alt, flux400_alt,
+Trise, Tfall, Tratio,
+Trise_alt, Tfall_alt, Tratio_alt
 """
 header += columns.replace("\n", '').replace(" ","")
-#print("header columns: %d" % header.count(','))
-#print(header)
+print("header columns: %d" % header.count(','))
+print(header)
 fout.write(header + "\n")
 linefmt = ('%f,' * (header.count(',')+1)).rstrip(',') + "\n"
 
@@ -310,11 +335,15 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	
 	if specz == 0:
 		z = 0
+		z_alt = numpy.nan
 	elif numpy.isfinite(specz):
 		z = specz
+		z_alt = specz
 	else:
 		z = photoz
-
+		z_alt = sample_photoz(photoz, photoz_error, Nsamples=10)
+		z_alt = z_alt[numpy.argmax(numpy.abs(z_alt - photoz)/(z_alt + 1))]
+	
 	all_time = object_data['mjd'].values
 	all_flux = object_data['flux'].values
 	all_flux_error = object_data['flux_err'].values
@@ -323,8 +352,10 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	lc_slope_features_all = []
 	
 	peakfluxes = []
+	peakfluxes_alt = []
 	peaktimes = []
-	
+	peaktimes_alt = []
+
 	for passband in bands:
 		mask = numpy.logical_and(all_passband == passband, 
 			numpy.logical_and(all_flux > 0, is_detected))
@@ -341,6 +372,9 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			peakflux, tpeak, lslope, rslope = LC_slope_singlefit(time, flux, flux_error, z)
 			peaktimes.append(tpeak)
 			peakfluxes.append([wavelengths[passband] / (1 + z), peakflux / passband_efficiencies[passband]])
+			peakflux, tpeak, lslope, rslope = LC_slope_singlefit(time, flux, flux_error, z_alt)
+			peaktimes_alt.append(tpeak)
+			peakfluxes_alt.append([wavelengths[passband] / (1 + z_alt), peakflux / passband_efficiencies[passband]])
 	
 	lc_slope_features_all = numpy.asarray(lc_slope_features_all)
 	peak_colors = lc_slope_features_all[:,-2] - lc_slope_features_all[:,-2].max()
@@ -350,20 +384,25 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 
 	if peaktimes:
 		tpeak_lo, tpeak_hi, tpeak = min(peaktimes), max(peaktimes), numpy.median(peaktimes)
+		tpeak_lo_alt, tpeak_hi_alt, tpeak_alt = min(peaktimes_alt), max(peaktimes_alt), numpy.median(peaktimes_alt)
 	else:
 		tpeak_lo, tpeak_hi, tpeak = None, None, all_time[all_flux.argmax()] / (1 + z)
+		tpeak_lo_alt, tpeak_hi_alt, tpeak_alt = None, None, all_time[all_flux.argmax()] / (1 + z_alt)
 	
-	Trise = []
-	Tfall = []
 	lastt = -100
 	deltat = 0.1
 	blueratioseries = []
 	redratioseries = []
 	Tseries = []
+	Trise = []
+	Tfall = []
+	Tseries_alt = []
+	Trise_alt = []
+	Tfall_alt = []
 	for t in numpy.unique(all_time[numpy.logical_and(all_flux > 0, is_detected)]):
 		if t < lastt + deltat:
 			continue
-		trest = t / (1 + z)
+		lastt = t
 		mask = numpy.logical_and(numpy.logical_and(all_time >= t, all_time < t + deltat), 
 			numpy.logical_and(all_flux > 0, is_detected))
 		if (all_passband[mask] == 0).any() and (all_passband[mask] == 1).any():
@@ -371,20 +410,25 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		if (all_passband[mask] == 4).any() and (all_passband[mask] == 5).any():
 			redratioseries.append([t, float(all_flux[mask][all_passband[mask] == 4].mean() / all_flux[mask][all_passband[mask] == 5].mean())])
 		
-		if mask.sum() < 3:
-			continue
-		passband = all_passband[mask]
-		norm = 10**((trest - tpeak)/20.)
-		if norm > 1000 or norm < 0.001:
-			norm = numpy.nan
-		Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
-		
-		Tseries.append([trest, Twave, slope, chi2diff])
-		if tpeak_lo is not None and trest < tpeak_lo:
-			Trise.append(Twave)
-		if tpeak_hi is not None and trest > tpeak_hi:
-			Tfall.append(Twave)
-		lastt = t
+		if mask.sum() > 3:
+			passband = all_passband[mask]
+			trest = t / (1 + z)
+			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
+			
+			Tseries.append([trest, Twave, slope, chi2diff])
+			if tpeak_lo is not None and trest < tpeak_lo:
+				Trise.append(Twave)
+			if tpeak_hi is not None and trest > tpeak_hi:
+				Tfall.append(Twave)
+
+			trest_alt = t / (1 + z_alt)
+			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z_alt), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
+			
+			Tseries_alt.append([trest_alt, Twave, slope, chi2diff])
+			if tpeak_lo_alt is not None and trest_alt < tpeak_lo_alt:
+				Trise_alt.append(Twave)
+			if tpeak_hi_alt is not None and trest_alt > tpeak_hi_alt:
+				Tfall_alt.append(Twave)
 	
 	if len(redratioseries) > 1:
 		tred, redratio = numpy.transpose(redratioseries)
@@ -392,7 +436,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		features += [redrise, redfall]
 	else:
 		features += [numpy.nan, numpy.nan]
-		
+	
 	if len(blueratioseries) > 1:
 		tblue, blueratio = numpy.transpose(blueratioseries)
 		bluerise, bluefall = numpy.mean(blueratio[tblue < tpeak]), numpy.mean(blueratio[tblue > tpeak])
@@ -401,7 +445,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		features += [numpy.nan, numpy.nan]
 	
 	# find eigenvectors of log(t_rest), log(wave), log(flux) surface
-	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z) < tpeak)
+	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1 + z) < tpeak)
 	if mask.sum() > 6:
 		passbands = all_passband[mask]
 		phi_rise, theta_rise, evolrise = fit_logplanetilt(all_time[mask] - all_time[mask].max() / (1 + z), 
@@ -412,7 +456,19 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			log10(all_flux[mask] / passband_efficiencies[passbands]))
 	else:
 		phi_rise, theta_rise, evolrise = numpy.nan, numpy.nan, numpy.nan
-	features += [phi_rise, theta_rise, evolrise]
+	
+	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z_alt) < tpeak)
+	if mask.sum() > 6 and numpy.isfinite(z_alt):
+		passbands = all_passband[mask]
+		phi_rise, theta_rise, evolrise_alt = fit_logplanetilt(all_time[mask] - all_time[mask].max() / (1 + z_alt), 
+			log10(wavelengths[passbands] / (1 + z_alt) / 300),
+			log10(all_flux[mask] / passband_efficiencies[passbands]))
+		phi_rise_alt, theta_rise_alt = fit_logplane(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
+			log10(wavelengths[passbands] / (1 + z_alt) / 300),
+			log10(all_flux[mask] / passband_efficiencies[passbands]))
+	else:
+		phi_rise_alt, theta_rise_alt, evolrise_alt = numpy.nan, numpy.nan, numpy.nan
+	features += [phi_rise, theta_rise, evolrise, phi_rise_alt, theta_rise_alt, evolrise_alt]
 
 	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z) > tpeak)
 	if mask.sum() > 6:
@@ -425,7 +481,19 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			log10(all_flux[mask] / passband_efficiencies[passbands]))
 	else:
 		phi_fall, theta_fall, evolfall = numpy.nan, numpy.nan, numpy.nan
-	features += [phi_fall, theta_fall, evolfall]
+	
+	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z_alt) > tpeak)
+	if mask.sum() > 6 and numpy.isfinite(z_alt):
+		passbands = all_passband[mask]
+		phi_fall, theta_fall, evolfall_alt = fit_logplanetilt(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
+			log10(wavelengths[passbands] / (1 + z_alt) / 300),
+			log10(all_flux[mask] / passband_efficiencies[passbands]))
+		phi_fall_alt, theta_fall_alt = fit_logplane(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
+			log10(wavelengths[passbands] / (1 + z_alt) / 300),
+			log10(all_flux[mask] / passband_efficiencies[passbands]))
+	else:
+		phi_fall_alt, theta_fall_alt, evolfall_alt = numpy.nan, numpy.nan, numpy.nan
+	features += [phi_fall, theta_fall, evolfall, phi_fall_alt, theta_fall_alt, evolfall_alt]
 
 	# plot 
 	if len(peakfluxes) > 2:
@@ -434,7 +502,13 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		wavenorm = 400 # evaluate the SED at 400nm rest-frame
 		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
 		features += [Twave, flux400]
+		
+		peakfluxes_alt = numpy.asarray(peakfluxes_alt)
+		Twave, s, slope, chi2diff = bbody_fit(peakfluxes_alt[:,0], peakfluxes_alt[:,1] / numpy.nanmax(peakfluxes_alt[:,1]))
+		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
+		features += [Twave, flux400]
 	else:
+		features += [numpy.nan, numpy.nan]
 		features += [numpy.nan, numpy.nan]
 	
 	# measure rising and falling fluxes
@@ -442,6 +516,10 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	Tfall = numpy.median(Tfall)
 	Tratio = log10(Trise / Tfall)
 	features += [Trise, Tfall, Tratio]
+	Trise_alt = numpy.median(Trise_alt)
+	Tfall_alt = numpy.median(Tfall_alt)
+	Tratio_alt = log10(Trise_alt / Tfall_alt)
+	features += [Trise_alt, Tfall_alt, Tratio_alt]
 	#print("   ",len(features))
 	fout.write(linefmt % tuple(features))
 
