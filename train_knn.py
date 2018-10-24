@@ -6,10 +6,12 @@ X = mytransformer.fit_transform(X)
 execute = unknown_data_file is not None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
-	unknown.pop('object_id')        
-	unknown = unknown.values                  
+	unknown.pop('object_id')
+	unknown = unknown.values
 	print('unknown:', unknown.shape)
-	unknown[~numpy.isfinite(unknown)] = -99
+	if simplify_space:
+		unknown = unknown[:,column_mask]
+	unknown = imp.transform(unknown)
 	unknown = mytransformer.transform(unknown)
 
 def train_and_evaluate(name, clf):
@@ -57,7 +59,7 @@ def train_and_evaluate(name, clf):
 
 for n_components in 10, 40, 100:
 	print("dimensionality reduction with PCA-%d" % n_components)
-	prefix = transform + '-PCA%d-' % n_components
+	prefix = ('SIMPLE' if simplify_space else '') + transform + '-PCA%d-' % n_components
 	t0 = time()
 	pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True).fit(X)
 	print("done in %0.3fs" % (time() - t0))
@@ -68,6 +70,8 @@ for n_components in 10, 40, 100:
 
 	#train_and_evaluate(prefix + 'NC', clf = NearestCentroid())
 	train_and_evaluate(prefix + 'LDA', clf = LinearDiscriminantAnalysis())
+	train_and_evaluate(prefix + 'SVC-default', clf = SVC(probability=True))
+	train_and_evaluate(prefix + 'SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
 
 	train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))
 	train_and_evaluate(prefix + 'KNN4', clf = KNeighborsClassifier(n_neighbors=4))
@@ -88,16 +92,14 @@ for n_components in 10, 40, 100:
 	#train_and_evaluate(prefix + 'GradientBoosting', clf = GradientBoostingClassifier(n_estimators=40))
 	#train_and_evaluate(prefix + 'ExtraTrees', clf = ExtraTreesClassifier(n_estimators=40))
 	
-	train_and_evaluate(prefix + 'MLP4', clf = MLPClassifier(hidden_layer_sizes=(4,)))
-	train_and_evaluate(prefix + 'MLP10', clf = MLPClassifier(hidden_layer_sizes=(10,)))
-	train_and_evaluate(prefix + 'MLP10-20-10', clf = MLPClassifier(hidden_layer_sizes=(10,20,10)))
-	train_and_evaluate(prefix + 'MLP4-16-4', clf = MLPClassifier(hidden_layer_sizes=(4,16,4)))
-	train_and_evaluate(prefix + 'MLP40', clf = MLPClassifier(hidden_layer_sizes=(40,)))
+	train_and_evaluate(prefix + 'MLP4', clf = MLPClassifier(hidden_layer_sizes=(4,), max_iter=2000))
+	train_and_evaluate(prefix + 'MLP10', clf = MLPClassifier(hidden_layer_sizes=(10,), max_iter=2000))
+	train_and_evaluate(prefix + 'MLP10-20-10', clf = MLPClassifier(hidden_layer_sizes=(10,20,10), max_iter=2000))
+	train_and_evaluate(prefix + 'MLP4-16-4', clf = MLPClassifier(hidden_layer_sizes=(4,16,4), max_iter=2000))
+	train_and_evaluate(prefix + 'MLP40', clf = MLPClassifier(hidden_layer_sizes=(40,), max_iter=2000))
 
 	#train_and_evaluate(prefix + 'LinearSVC-default', clf = LinearSVC())
 	#train_and_evaluate(prefix + 'LinearSVC-0.1', clf = LinearSVC(C = 0.1, gamma = 0.05))
-	#train_and_evaluate(prefix + 'SVC-default', clf = SVC(probability=True))
-	#train_and_evaluate(prefix + 'SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
 	
 	#break
 

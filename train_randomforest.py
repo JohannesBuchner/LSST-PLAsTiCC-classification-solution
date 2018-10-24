@@ -9,9 +9,10 @@ execute = unknown_data_file is not None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
 	unknown.pop('object_id')        
-	unknown = unknown.values                  
+	unknown = unknown.values
 	print('unknown:', unknown.shape)
-	unknown[~numpy.isfinite(unknown)] = -99
+	unknown = imp.transform(unknown)
+	#unknown[~numpy.isfinite(unknown)] = -99
 	#unknown = qt.transform(unknown)
 
 def train_and_evaluate(name, clf):
@@ -83,15 +84,37 @@ if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 	#	cv=StratifiedKFold(2), scoring=scorer)
 	rfe.fit(X, Y)
 	print('done after %.1fs' % (time() - t0))
-	print(rfe.grid_scores_)
+	#print(rfe.grid_scores_)
 
 	indices = numpy.argsort(rfe.ranking_)
 	print("Feature ranking:")
-	fcols = open('important_columns.txt', 'w')
+	fcols = open('important_columns1.txt', 'w')
 	for f, index in enumerate(indices):
 		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train.columns[index]))
 		if rfe.ranking_[index] == 1:
 			fcols.write("%d\t%s\n" % (index,train.columns[index]))
+	
+	premask = rfe.ranking_ <= 4
+	#premask = rfe.ranking_ > 0
+	Z = mytransformer.fit_transform(X[:,premask])
+	print("Recursive feature elimination with SVC...")
+	clf = LinearSVC(max_iter=10000)
+	t0 = time()
+	rfe = RFE(estimator=clf, n_features_to_select=30, step=0.1, verbose=2)
+	#rfe = RFECV(estimator=clf, min_features_to_select=10, step=0.1, verbose=2, 
+	#	cv=StratifiedKFold(2), scoring=scorer)
+	rfe.fit(Z, Y)
+	print('done after %.1fs' % (time() - t0))
+	#print(rfe.grid_scores_)
+
+	indices = numpy.argsort(rfe.ranking_)
+	print("Feature ranking:")
+	fcols = open('important_columns2.txt', 'w')
+	for f, index in enumerate(indices):
+		oldindex = numpy.where(premask)[0][index]
+		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train.columns[oldindex]))
+		if rfe.ranking_[index] == 1:
+			fcols.write("%d\t%s\n" % (index,train.columns[oldindex]))
 	
 	sys.exit(0)
 
@@ -109,6 +132,7 @@ train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=
 train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
 train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
 train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40))
+#train_and_evaluate('RandomForest4000', clf = RandomForestClassifier(n_estimators=4000))
 
 # TODO:
 

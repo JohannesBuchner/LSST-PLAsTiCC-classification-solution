@@ -15,6 +15,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import RidgeClassifier, RidgeClassifierCV, LogisticRegression, LogisticRegressionCV
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.impute import SimpleImputer
 #from xgboost import XGBClassifier
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics.classification import _weighted_sum
@@ -45,7 +46,18 @@ custom_class_weights = numpy.array([weights_targets[l] for l in labels])
 
 Y = Y_orig
 X = train.values
-X[~numpy.isfinite(X)] = -99
+
+simplify_space = os.environ.get('SIMPLIFY', '0') == '1'
+if simplify_space:
+	important_columns = set([line.split()[1] for line in open('important_columns.txt')])
+	column_mask = numpy.array([c in important_columns for c in train.columns if c not in ('object_id', 'target')])
+	X = X[:,column_mask]
+else:
+	column_mask = numpy.array([True for c in train.columns])
+
+#X[~numpy.isfinite(X)] = -99
+imp = SimpleImputer(missing_values=numpy.nan, strategy='mean')
+X = imp.fit_transform(X)
 
 transform = os.environ.get('TRANSFORM', 'MM')
 if transform == 'QTU':

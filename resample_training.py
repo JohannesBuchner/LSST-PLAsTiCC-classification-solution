@@ -19,6 +19,31 @@ oversample_rates = {target:min(20, max(0, int((ntarget - nhave[target] + 0.2) / 
 hypersample_rates = {target: max(0, (ntarget - nhave[target] - nhaveddf[target] * oversample_rates[target]) / nhave[target]) for target in targets}
 undersample_rates = {target: uppertarget * 1. / nhave[target] for target in targets}
 
+c = pandas.read_csv('test_set_metadata.csv')
+mask = c.hostgal_specz > 0
+specz = c.hostgal_specz[mask].values
+photoz = c.hostgal_photoz[mask].values
+del c
+
+Nz = 15
+zindex = (numpy.log10(photoz+1) * Nz / 0.5).astype(int)
+zindex[zindex <  0] = 0
+zindex[zindex > Nz-1] = Nz-1
+zdists = [[] for i in range(Nz)]
+for zi, speczi in zip(zindex, specz):
+	zdists[zi].append(speczi)
+zdists = [numpy.sort(zdist) for zdist in zdists]
+
+def sample_photoz(photozi, photozi_err, Nsamples=None):
+	# original:
+	# return numpy.random.normal(photozi, photozi_err, size=Nsamples)
+	# draw from empirical distribution
+	zindexi = int(numpy.log10(photozi+1) * Nz / 0.5)
+	zindexi = max(0, min(Nz-1, zindexi))
+	zdist = zdists[zindexi]
+	znew = numpy.random.choice(zdist, replace=True, size=Nsamples)
+	#print(photozi, '->', znew)
+	return znew
 
 print("number of objects in each class:")
 print(' '.join(['%4d' % nhave[target] for target in targets]))
@@ -34,6 +59,20 @@ print(' '.join(['%.2f' % hypersample_rates[target] for target in targets]))
 stream_meta = open('training_set_metadata.csv')
 outstream_meta = open('resampled_training_set_metadata.csv', 'w')
 outstream_meta.write(stream_meta.readline())
+def add_noise(metaline):
+	_,ra,decl,gal_l,gal_b,ddf,hostgal_specz,hostgal_photoz,hostgal_photoz_err,distmod,mwebv,target = metaline.split(',')
+	ra    = '%f' % max(0, min(360, numpy.random.normal(float(ra), 0.1)))
+	decl  = '%f' % max(-180, min(180, numpy.random.normal(float(decl), 0.1)))
+	gal_l = '%f' % max(0, min(360, numpy.random.normal(float(gal_l), 0.1)))
+	gal_b = '%f' % max(-180, min(180, numpy.random.normal(float(gal_b), 0.1)))
+	if float(hostgal_photoz) > 0:
+		hostgal_photoz = '%f' % sample_photoz(float(hostgal_photoz), float(hostgal_photoz_err))
+		hostgal_photoz_err = '%f' % max(0, numpy.random.normal(float(hostgal_photoz_err), 0.01))
+	hostgal_specz = '0'
+	distmod = '%f' % max(0, numpy.random.normal(float(distmod), 0.001))
+	mwebv = '%f' % max(0, numpy.random.normal(float(mwebv), 0.01))
+	
+	return ',' + ','.join([ra,decl,gal_l,gal_b,ddf,hostgal_specz,hostgal_photoz,hostgal_photoz_err,distmod,mwebv,target])
 
 stream_data = open('training_set.csv')
 outstream_data = open('resampled_training_set.csv', 'w')
@@ -100,7 +139,7 @@ for line in stream_data:
 					outstream_meta.write(prefix + current_meta_line)
 				else:
 					# set DDF to 0
-					outstream_meta.write(prefix + current_meta_line.replace(',1,', ',0,'))
+					outstream_meta.write(prefix + add_noise(current_meta_line.replace(',1,', ',0,')))
 		
 		# set to new object
 		input_times = []

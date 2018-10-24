@@ -3,14 +3,13 @@ from alltrain import *
 from sklearn.cluster import KMeans, MiniBatchKMeans, AgglomerativeClustering
 X_galmask = train.hostgal_photoz.values == 0
 # remove some columns that we do not want to use
-X = X[:,5:] # RA, DEC, l, b, ddf
-X = X[:,5:] # specz, photoz, photozerr, distmod, mwebv
+#X = X[:,5:] # RA, DEC, l, b, ddf
 
 print('train gal/exgal:', X_galmask.sum(), (~X_galmask).sum())
 #qt = QuantileTransformer(output_distribution='normal')
 qt = MinMaxScaler(feature_range=(-1,1))
 X = qt.fit_transform(X)
-
+#X = X[:,5:] # specz, photoz, photozerr, distmod, mwebv
 
 execute = unknown_data_file is not None
 if execute:
@@ -22,8 +21,10 @@ if execute:
 	unknown = unknown[:,5:] # remove columns RA, DEC, l, b, ddf
 	unknown = unknown[:,5:] # specz, photoz, photozerr, distmod, mwebv
 	print('unknown:', unknown.shape)
-	unknown[~numpy.isfinite(unknown)] = -99
+	unknown = imp.transform(unknown)
 	unknown = qt.transform(unknown)
+	if simplify_space:
+		unknown = unknown[:,column_mask]
 
 classes = [6,15,16,42,52,53,62,64,65,67,88,90,92,95,99]
 
@@ -92,7 +93,7 @@ OUTLIERS_STRENGTH = float(os.environ.get('OUTLIERS_STRENGTH', '2.0'))
 k = int(os.environ.get('K', '20'))
 n_components = int(os.environ.get('NPCACOMP', '40'))
 
-prefix = 'PCA%d' % n_components
+prefix = ('SIMPLE' if simplify_space else '') + 'PCA%d' % n_components
 pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True)
 
 for name in [prefix + '-Kmeans%d' % k]:#, prefix + '-HierCluster%d' % k]:
