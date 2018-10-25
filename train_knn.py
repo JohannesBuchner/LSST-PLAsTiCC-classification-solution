@@ -1,5 +1,6 @@
 from __future__ import print_function, division
 from alltrain import *
+del train
 
 X = mytransformer.fit_transform(X)
 
@@ -21,6 +22,7 @@ def train_and_evaluate(name, clf):
 	t0 = time()
 	q = cross_val_score(clf, X_white, Y, cv=4, scoring=scorer, n_jobs=4)
 	print('%2.2f +- %2.2f %s (training speed: %.1fs)' % (q.mean(), q.std(), name, time() - t0))
+	sys.stdout.flush()
 
 	if not execute:
 		# manual masking of one third
@@ -31,6 +33,7 @@ def train_and_evaluate(name, clf):
 			y_pred = clf.predict(X_test)
 		
 		print('confusion matrix: (eval speed: %.2fs)' % (time() - t0))
+		sys.stdout.flush()
 	#cnf_matrix = confusion_matrix(y_test, y_pred)
 	#print(cnf_matrix)
 	#print 'ROC curve plot...'
@@ -48,6 +51,7 @@ def train_and_evaluate(name, clf):
 	if execute:
 		t0 = time()
 		print('predictions for training data...')
+		sys.stdout.flush()
 		predictions = cross_val_predict(clf, X_white, Y, cv=4, method='predict_proba', n_jobs=4)
 		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
 		clf.fit(X_white, Y)
@@ -55,9 +59,12 @@ def train_and_evaluate(name, clf):
 		print('predictions for unknown data...')
 		numpy.savetxt(unknown_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
 		print('predictions done after %.1fs' % (time() - t0))
+	sys.stdout.flush()
 	return clf
 
 for n_components in 10, 40, 100:
+	if n_components > X.shape[1]:
+		n_components = X.shape[1]
 	print("dimensionality reduction with PCA-%d" % n_components)
 	prefix = ('SIMPLE' if simplify_space else '') + transform + '-PCA%d-' % n_components
 	t0 = time()

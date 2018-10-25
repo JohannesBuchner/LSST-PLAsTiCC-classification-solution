@@ -29,9 +29,9 @@ def compute_concavity(x, y, yerr, ymodel):
 def fit_logline(time, flux, flux_error):
 	x, y, y_err = time, numpy.log10(flux), numpy.log10(flux_error)
 	slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
-	excess_variance, concavity = compute_concavity(time, flux, flux_error, ymodel=10**(slope * x + intercept))
+	#excess_variance, concavity = compute_concavity(time, flux, flux_error, ymodel=10**(slope * x + intercept))
+	excess_variance, concavity = std_err, r_value
 
-	t = numpy.linspace(x[0], x[-1], 400)
 	return [slope, intercept, excess_variance, concavity]
 
 def xyplot(x, y, color=None, lo=None, hi=None):
@@ -200,19 +200,6 @@ def bbody_fit(wave, flux):
 ## ugrizY EBV effect, assuming a flat spectrum
 #extinction_factors = [0.0092394833, 0.0336530868, 0.0938432007, 0.1868623254, 0.2921024403, 0.4306847762]
 bands = range(6)
-# very roughly read off the LSST passband plot
-"""
-wavelengths = [] #[3500, 4750, 6250, 7500, 8750, 9500]
-passband_efficiencies = [] #[0.05, 0.7, 0.95, 0.9, 0.7, 0.4]
-bandnames = 'ugrizy'
-for name in bandnames:
-	wave, throughput = numpy.loadtxt('throughputs/baseline/filter_%s.dat' % name).transpose()
-	mean_wavelength = numpy.trapz(y=wave * throughput, x=wave) / numpy.trapz(y=throughput, x=wave)
-	wavelengths.append(mean_wavelength)
-	mean_throughput = numpy.trapz(y=throughput, x=wave)
-	passband_efficiencies.append(mean_throughput)
-print(list(zip(bandnames, wavelengths, passband_efficiencies)))
-"""
 
 # very roughly read off the LSST passband plot
 wavelengths = [357, 475, 621, 755, 879, 1000]
@@ -221,38 +208,28 @@ passband_efficiencies = [65, 140, 131, 118, 98, 151]
 wavelengths = numpy.array(wavelengths)
 passband_efficiencies = numpy.array(passband_efficiencies)
 
-target_of_interest = int(sys.argv[1])
+print("loading metadata ...")
+metadata_all = pandas.read_csv(sys.argv[1] + '_metadata.csv')
+metadata_all = metadata_all.set_index('object_id')
+print("loading data ...")
+object_data_all = pandas.read_csv(sys.argv[1] + '.csv')
+object_data_all = object_data_all.set_index('object_id')
 
-a = pandas.read_csv('training_set.csv')
-b = pandas.read_csv('training_set_metadata.csv')
-a = a.set_index('object_id')
-b = b.set_index('object_id')
-b = b[numpy.logical_and(b.ddf == 1, b.target == target_of_interest)]
+if not os.path.exists('viz'): os.mkdir('viz')
 
-e = a.join(b)
-del a, b
+for object_id in map(int, sys.argv[2:]):
+	metadata = metadata_all.loc[object_id]
+	object_data = object_data_all.loc[object_id]
+	# columns:
+	# columns = ['mjd', 'passband', 'flux', 'flux_err', 'detected']
+	# object_columns = ['ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv', 'target']
 
-# columns:
-# columns = ['mjd', 'passband', 'flux', 'flux_err', 'detected']
-# object_columns = ['ra', 'decl', 'gal_l', 'gal_b', 'ddf', 'hostgal_specz', 'hostgal_photoz', 'hostgal_photoz_err', 'distmod', 'mwebv', 'target']
+	fileprefix = 'viz/object%d_' % (object_id)
 
-plt.figure('SEDevol', figsize=(5, 20))
-plt.figure('temperature-timeseries', figsize=(5, 10))
 
-n = 0
-
-for object_id, object_data in e.groupby(e.index.get_level_values(0)):
-	if object_data['ddf'].values[0] == 0:
-		continue
-	target = object_data['target'].values[0]
-	if target != target_of_interest: 
-		continue
-	if n > 20:
-		break
-
-	specz = object_data['hostgal_specz'].values[0]
-	photoz = object_data['hostgal_photoz'].values[0]
-	photoz_error = object_data['hostgal_photoz_err'].values[0]
+	specz = metadata['hostgal_specz']
+	photoz = metadata['hostgal_photoz']
+	photoz_error = metadata['hostgal_photoz_err']
 	if specz == 0:
 		z = 0
 	elif numpy.isfinite(specz):
@@ -260,23 +237,31 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	else:
 		z = photoz
 
-	print()
-	print(target, object_id)
 	all_time = object_data['mjd'].values
 	all_flux = object_data['flux'].values
 	all_flux_error = object_data['flux_err'].values
 	all_passband = object_data['passband'].values
-	is_detected = object_data['detected'] == 1
-	
+	is_detected = object_data['detected'].values == 1
+	print(object_id, len(object_data), is_detected.sum())
+	if not numpy.logical_and(all_flux > 0, is_detected).any():
+		print("%d NEVER DETECTED!" % object_id)
+		continue
+
+	plt.figure('SEDevol', figsize=(5, 20))
+	plt.figure('temperature-timeseries', figsize=(5, 10))
 	peakfluxes = []
 	peaktimes = []
 	ndips = []
 	npeaks = []
 	runstat2 = [numpy.nan]*7
-	
+
 	for passband in bands:
+		prefix = '%d' % passband
+		fileprefix = 'viz/object%d_%d' % (object_id, passband)
+
 		mask = numpy.logical_and(all_passband == passband, 
 			numpy.logical_and(all_flux > 0, is_detected))
+		print("  band %d: %d data points" % (passband, mask.sum()))
 		if mask.sum() < 2: continue
 		
 		flux = all_flux[mask]
@@ -307,6 +292,9 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 				]
 			plt.figure("dist")
 			plt.hist(numpy.log10(flux / numpy.median(flux)), cumulative=True, bins=100, normed=True, histtype='step')
+			plt.xlabel('Flux')
+			plt.savefig(fileprefix + 'dist.pdf', bbox_inches='tight')
+			plt.close()
 			
 		
 		# create features
@@ -314,10 +302,40 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		peaktimes.append(tpeak)
 		#print('    peak@%d' % tpeak)
 		peakfluxes.append([wavelengths[passband] / (1 + z), peakflux / passband_efficiencies[passband]])
-
+		
 		plt.figure('timeseries%d' % passband)
 		r = plt.errorbar(x=(time - all_time.min()) / (1 + z), y=flux / flux.max(), yerr=flux_error / flux.max(), linestyle='-', marker='x')
-	
+		plt.xlabel('Restframe time [d]')
+		plt.ylabel('Flux')
+		plt.yscale('log')
+		plt.savefig(fileprefix + 'timeseries.pdf',  bbox_inches='tight')
+		plt.close()
+
+		plt.figure('timeseries-normed' + prefix)
+		plt.xlabel('Restframe time [d]')
+		plt.ylabel('Flux')
+		plt.yscale('log')
+		plt.ylim(1e-3, 1)
+		plt.savefig(fileprefix + 'timeseries-normed.pdf',  bbox_inches='tight')
+		plt.close()
+
+		plt.figure('slopes' + prefix)
+		plt.xlabel('Rising slope')
+		plt.ylabel('Falling slope')
+		plt.plot([1e-4,0.1], [1e-4,0.1], ':', color='k')
+		plt.xscale('log')
+		plt.yscale('log')
+		plt.savefig(fileprefix + 'slopes.pdf', bbox_inches='tight')
+		plt.close()
+
+		plt.figure('Lz' + prefix)
+		plt.xlabel('1+z')
+		plt.ylabel('Peak Flux')
+		plt.yscale('log')
+		plt.savefig(fileprefix + 'Lz.pdf', bbox_inches='tight')
+		plt.close()
+
+	fileprefix = 'viz/object%d_' % (object_id)
 	if peaktimes:
 		tpeak_lo, tpeak_hi, tpeak = min(peaktimes), max(peaktimes), numpy.median(peaktimes)
 	else:
@@ -344,27 +362,37 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		
 		if mask.sum() > 3:
 			passband = all_passband[mask]
-			trest = t / (1 + z)
 			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
 
 			plt.figure('SEDevol')
 			norm = 10**((trest - tpeak)/20.)
-			if norm > 1000 or norm < 0.001:
-				norm = numpy.nan
-			r = plt.plot(wavelengths[passband] / (1 + z), norm * all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband], 'o-')
+			#if norm > 1000 or norm < 0.001:
+			#	norm = numpy.nan
+			r = plt.plot(wavelengths[passband] / (1 + z), norm * all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband], 'o ')
 			color = r[0].get_color()
 			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
 			wave = numpy.linspace(Tmin*3, Tmax/3, 400)
 			plt.plot(wave, norm * s * wave**-5 / (numpy.exp(1/(wave/Twave)) - 1), ':', color=color)
 			
+			plt.figure('color')
+			wavenorm = 400 # evaluate the SED at 1um rest-frame
+			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
+			plt.plot(Twave, flux400, 'o', ms=2, color=color)
 			
 			Tseries.append([trest, Twave, slope, chi2diff])
 			if tpeak_lo is not None and trest < tpeak_lo:
 				Trise.append(Twave)
 			if tpeak_hi is not None and trest > tpeak_hi:
 				Tfall.append(Twave)
-
 	if len(Tseries) > 2:
+		plt.figure('SEDevol')
+		plt.xlabel('Restframe Wavelength [nm]')
+		plt.ylabel('Flux [offset by time]')
+		plt.yscale('log')
+		plt.xscale('log')
+		plt.savefig(fileprefix + 'SEDevol.pdf', bbox_inches='tight')
+		plt.close()
+
 		Tseries = numpy.array(Tseries)
 		plt.figure('temperature-timeseries')
 		plt.subplot(3, 1, 1)
@@ -373,7 +401,20 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		plt.plot(Tseries[:,0] - tpeak, Tseries[:,2], 'x-', ms=2)
 		plt.subplot(3, 1, 3)
 		plt.plot(Tseries[:,0] - tpeak, Tseries[:,3], 'x-', ms=2)
-	
+		plt.subplot(3, 1, 1)
+		plt.ylabel('Temperature [nm]')
+		plt.xlabel('Restframe time [d]')
+		plt.yscale('log')
+		plt.ylim(Tmin, Tmax)
+		plt.subplot(3, 1, 2)
+		plt.ylabel('SED slope')
+		plt.xlabel('Restframe time [d]')
+		plt.subplot(3, 1, 3)
+		plt.ylabel('$\chi^2$(BB)-$\chi^2$(PL)')
+		plt.xlabel('Restframe time [d]')
+		plt.savefig(fileprefix + 'Tseries.pdf', bbox_inches='tight')
+		plt.close()
+
 	if len(redratioseries) > 1:
 		tred, redratio = numpy.transpose(redratioseries)
 		redrise, redfall = numpy.mean(redratio[tred < tpeak]), numpy.mean(redratio[tred > tpeak])
@@ -382,7 +423,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		tblue, blueratio = numpy.transpose(blueratioseries)
 		bluerise, bluefall = numpy.mean(blueratio[tblue < tpeak]), numpy.mean(blueratio[tblue > tpeak])
 		print("blue ratios: %.2f %.2f" % (bluerise, bluefall))
-	
+
 	# find eigenvectors of log(t_rest), log(wave), log(flux) surface
 	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1 + z) < tpeak)
 	if mask.sum() > 6:
@@ -395,7 +436,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			log10(all_flux[mask] / passband_efficiencies[passbands]))
 	else:
 		phi_rise, theta_rise, evolrise = numpy.nan, numpy.nan, numpy.nan
-	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z) > tpeak)
+	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1 + z) > tpeak)
 	if mask.sum() > 6:
 		passbands = all_passband[mask]
 		phi_fall, theta_fall, evolfall = fit_logplanetilt(all_time[mask] - all_time[mask].min() / (1 + z), 
@@ -409,158 +450,69 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	plt.figure('slopeevol')
 	r = plt.plot([phi_rise, -phi_fall], [theta_rise, theta_fall], 'o-')
 	color = r[0].get_color()
+	plt.xlabel(r'Flux-Time slope $\log\phi = t \times \tau$')
+	plt.ylabel(r'Flux-wavelength slope $\log\phi=\log(\lambda/10\mu m) \times \Lambda$')
+	plt.xlim(-0.1, 0.2)
+	plt.vlines(0, -3, 5, linestyle=':', colors='k')
+	plt.ylim(-3, 5)
+	plt.savefig(fileprefix + 'slopeevol.pdf', bbox_inches='tight')
+	plt.close()
 	
 	plt.figure('colorevol')
 	xyplot(evolrise, evolfall, color=color, lo=-0.5, hi=0.5)
+	plt.xlabel(r'Rise evolution')
+	plt.ylabel(r'Fall evolution')
+	plt.savefig(fileprefix + 'colorevol.pdf', bbox_inches='tight')
+	plt.close()
 
 	# plot 
-	if len(peakfluxes) > 2:
+	if len(peakfluxes) > 0:
 		peakfluxes = numpy.asarray(peakfluxes)
 		plt.figure('SED')
 		plt.plot(peakfluxes[:,0], peakfluxes[:,1] / numpy.nanmax(peakfluxes[:,1]), 'o-')
 		Twave, s, slope, chi2diff = bbody_fit(peakfluxes[:,0], peakfluxes[:,1] / numpy.nanmax(peakfluxes[:,1]))
 		wave = numpy.linspace(Tmin*3, Tmax/3, 400)
 		plt.plot(wave, s * wave**-5 / (numpy.exp(1/(wave/Twave)) - 1), color=color)
+		plt.xlabel('Restframe Wavelength [nm]')
+		plt.ylabel('Flux')
+		plt.yscale('log')
+		plt.xscale('log')
+		plt.savefig(fileprefix + 'SED.pdf', bbox_inches='tight')
+		plt.close()
 		
 		plt.figure('color')
 		wavenorm = 400 # evaluate the SED at 1um rest-frame
 		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
 		plt.plot(Twave, flux400, 'x', ms=2, color=color)
-		n += 1
-	
+		plt.xlabel('Temperature [nm]')
+		plt.ylabel('Flux')
+		plt.xlim(Tmin, Tmax)
+		plt.yscale('log')
+		plt.savefig(fileprefix + 'color.pdf', bbox_inches='tight')
+		plt.close()
+
 	# measure rising and falling fluxes
 	Trise = numpy.median(Trise)
 	Tfall = numpy.median(Tfall)
 	plt.figure('slopecolor')
 	xyplot(Trise, Tfall, color=color, lo=300, hi=40000)
+	plt.xlabel('Rise Temperature [nm]')
+	plt.ylabel('Fall Temperature [nm]')
+	plt.xlim(Tmin, Tmax)
+	plt.ylim(Tmin, Tmax)
+	plt.savefig(fileprefix + 'slopecolor.pdf', bbox_inches='tight')
+	plt.close()
+	
 	if len(ndips) > 0:
 		print("# of dips:", numpy.max(ndips), "# of peaks:", numpy.max(npeaks))
 	
 	plt.figure('dipstat')
 	plt.plot(range(7), runstat2, marker='s', color=color)
+	plt.xticks(range(7), '#data,#dips,#peaks,avg\nuprun,std\nuprun,avg\ndownrun,std\ndownrun'.split(','))
+	plt.savefig(fileprefix + 'dipstat.pdf', bbox_inches='tight')
+	plt.close()
+	plt.close('all')
 	#[numpy.max(ndips) if ndips else numpy.nan, 
 	#numpy.max(npeaks) if npeaks else numpy.nan], 
-
-if not os.path.exists('viz'): os.mkdir('viz')
-fileprefix = 'viz/target%d_' % (target_of_interest)
-
-print("making SED plot ...")
-plt.figure('SED')
-plt.xlabel('Restframe Wavelength [nm]')
-plt.ylabel('Flux')
-plt.yscale('log')
-plt.xscale('log')
-plt.savefig(fileprefix + 'SED.pdf', bbox_inches='tight')
-plt.close()
-
-print("making SED evolution plot ...")
-plt.figure('SEDevol')
-plt.xlabel('Restframe Wavelength [nm]')
-plt.ylabel('Flux [offset by time]')
-plt.yscale('log')
-plt.xscale('log')
-plt.savefig(fileprefix + 'SEDevol.pdf', bbox_inches='tight')
-plt.close()
-
-print("making slope-color plot ...")
-plt.figure('slopecolor')
-plt.xlabel('Rise Temperature [nm]')
-plt.ylabel('Fall Temperature [nm]')
-plt.xlim(Tmin, Tmax)
-plt.ylim(Tmin, Tmax)
-plt.savefig(fileprefix + 'slopecolor.pdf', bbox_inches='tight')
-plt.close()
-
-print("making slope-evol plot ...")
-plt.figure('slopeevol')
-plt.xlabel(r'Flux-Time slope $\log\phi = t \times \tau$')
-plt.ylabel(r'Flux-wavelength slope $\log\phi=\log(\lambda/10\mu m) \times \Lambda$')
-plt.xlim(-0.1, 0.2)
-plt.vlines(0, -3, 5, linestyle=':', colors='k')
-plt.ylim(-3, 5)
-plt.savefig(fileprefix + 'slopeevol.pdf', bbox_inches='tight')
-plt.close()
-
-print("making slope-evol plot ...")
-plt.figure('colorevol')
-plt.xlabel(r'Rise evolution')
-plt.ylabel(r'Fall evolution')
-plt.savefig(fileprefix + 'colorevol.pdf', bbox_inches='tight')
-plt.close()
-
-print("making dipstat plot ...")
-plt.figure('dipstat')
-plt.xticks(range(7), '#data,#dips,#peaks,avg\nuprun,std\nuprun,avg\ndownrun,std\ndownrun'.split(','))
-plt.savefig(fileprefix + 'dipstat.pdf', bbox_inches='tight')
-plt.close()
-
-print("making dist plot ...")
-plt.figure('dist')
-plt.xlabel('Flux')
-plt.savefig(fileprefix + 'dist.pdf', bbox_inches='tight')
-plt.close()
-
-print("making color-mag plot ...")
-plt.figure('color')
-plt.xlabel('Temperature [nm]')
-plt.ylabel('Flux')
-plt.xlim(Tmin, Tmax)
-plt.yscale('log')
-plt.savefig(fileprefix + 'color.pdf', bbox_inches='tight')
-plt.close()
-
-print("making Tseries plot ...")
-plt.figure('temperature-timeseries')
-plt.subplot(3, 1, 1)
-plt.ylabel('Temperature [nm]')
-plt.xlabel('Restframe time [d]')
-plt.yscale('log')
-plt.ylim(Tmin, Tmax)
-plt.subplot(3, 1, 2)
-plt.ylabel('SED slope')
-plt.xlabel('Restframe time [d]')
-plt.subplot(3, 1, 3)
-plt.ylabel('$\chi^2$(BB)-$\chi^2$(PL)')
-plt.xlabel('Restframe time [d]')
-plt.savefig(fileprefix + 'Tseries.pdf', bbox_inches='tight')
-plt.close()
-
-for passband in bands:
-	prefix = '%d' % passband
-	fileprefix = 'viz/target%d_%d' % (target_of_interest, passband)
-	print("making timeseries plot ...")
-	plt.figure('timeseries' + prefix)
-	plt.xlabel('Restframe time [d]')
-	plt.ylabel('Flux')
-	plt.yscale('log')
-	plt.savefig(fileprefix + 'timeseries.pdf',  bbox_inches='tight')
-	plt.close()
-
-	plt.figure('timeseries-normed' + prefix)
-	plt.xlabel('Restframe time [d]')
-	plt.ylabel('Flux')
-	plt.yscale('log')
-	plt.ylim(1e-3, 1)
-	plt.savefig(fileprefix + 'timeseries-normed.pdf',  bbox_inches='tight')
-	plt.close()
-
-	print("making slopes plot ...")
-	plt.figure('slopes' + prefix)
-	plt.xlabel('Rising slope')
-	plt.ylabel('Falling slope')
-	plt.plot([1e-4,0.1], [1e-4,0.1], ':', color='k')
-	plt.xscale('log')
-	plt.yscale('log')
-	plt.savefig(fileprefix + 'slopes.pdf', bbox_inches='tight')
-	plt.close()
-
-	print("making Lz plot ...")
-	plt.figure('Lz' + prefix)
-	plt.xlabel('1+z')
-	plt.ylabel('Peak Flux')
-	plt.yscale('log')
-	#plt.xscale('log')
-	plt.savefig(fileprefix + 'Lz.pdf', bbox_inches='tight')
-	plt.close()
 
 

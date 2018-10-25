@@ -47,6 +47,7 @@ custom_class_weights = numpy.array([weights_targets[l] for l in labels])
 Y = Y_orig
 X = train.values
 
+valid_columns = numpy.array([numpy.isfinite(X[:,i]).any() for i in range(X.shape[1])])
 simplify_space = os.environ.get('SIMPLIFY', '0') == '1'
 if simplify_space:
 	important_columns = set([line.split()[1] for line in open('important_columns.txt')])
@@ -55,8 +56,10 @@ if simplify_space:
 else:
 	column_mask = numpy.array([True for c in train.columns])
 
+# imputing also removes columns which have no useful values, so we need to know those
+valid_column_mask = numpy.logical_and(column_mask, valid_columns)
+imp = SimpleImputer(missing_values=numpy.nan, strategy='mean', copy=False)
 #X[~numpy.isfinite(X)] = -99
-imp = SimpleImputer(missing_values=numpy.nan, strategy='mean')
 X = imp.fit_transform(X)
 
 transform = os.environ.get('TRANSFORM', 'MM')

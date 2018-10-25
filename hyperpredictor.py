@@ -35,10 +35,10 @@ def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 
 scorer = make_scorer(my_log_loss, eps=1e-15, greater_is_better=False, needs_proba=True, labels=labels)
 
-
+N = int(os.environ.get('NNEURONS', '40'))
 t0 = time()
 print("training MLP...")
-clf = MLPClassifier(hidden_layer_sizes=40)
+clf = MLPClassifier(hidden_layer_sizes=N, max_iter=2000)
 q = cross_val_score(clf, X, Y, cv=5, scoring=scorer)
 print('%.3f +- %.3f' % (q.mean(), q.std()))
 print('training done after %.1fs' % (time() - t0))

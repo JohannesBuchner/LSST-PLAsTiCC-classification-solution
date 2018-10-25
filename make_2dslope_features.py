@@ -67,7 +67,6 @@ def fit_logline(time, flux, flux_error):
 	#excess_variance, concavity = compute_concavity(time, flux, flux_error, ymodel=10**(slope * x + intercept))
 	excess_variance, concavity = std_err, r_value
 
-	t = numpy.linspace(x[0], x[-1], 400)
 	return [slope, intercept, excess_variance, concavity]
 
 def fit_logplane(x, y, z):
@@ -310,6 +309,8 @@ for color in 'ugrizY':
 		header += "%s_%s_median,%s_%s_iqr," % (color, c, color, c)
 	header += "%s_peakcolor,%s_peakcolori," % (color, color)
 columns = """
+Tflux_slope, Tflux_corr,
+Tflux_slope_alt, Tflux_corr_alt,
 redrise, redfall,
 bluerise, bluefall,
 phi_rise, theta_rise, evolrise,
@@ -396,9 +397,11 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	Tseries = []
 	Trise = []
 	Tfall = []
+	Tflux = []
 	Tseries_alt = []
 	Trise_alt = []
 	Tfall_alt = []
+	Tflux_alt = []
 	for t in numpy.unique(all_time[numpy.logical_and(all_flux > 0, is_detected)]):
 		if t < lastt + deltat:
 			continue
@@ -414,6 +417,9 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			passband = all_passband[mask]
 			trest = t / (1 + z)
 			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
+
+			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
+			Tflux.append([Twave, flux400])
 			
 			Tseries.append([trest, Twave, slope, chi2diff])
 			if tpeak_lo is not None and trest < tpeak_lo:
@@ -424,11 +430,28 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			trest_alt = t / (1 + z_alt)
 			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z_alt), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
 			
+			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
+			Tflux_alt.append([Twave, flux400])
+			
 			Tseries_alt.append([trest_alt, Twave, slope, chi2diff])
 			if tpeak_lo_alt is not None and trest_alt < tpeak_lo_alt:
 				Trise_alt.append(Twave)
 			if tpeak_hi_alt is not None and trest_alt > tpeak_hi_alt:
 				Tfall_alt.append(Twave)
+	
+	Tflux = numpy.array(Tflux)
+	if len(Tflux_alt) > 3:
+		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux[:,0]), log10(Tflux[:,1]))
+		features += [slope, r_value]
+	else:
+		features += [numpy.nan, numpy.nan]
+	
+	Tflux_alt = numpy.array(Tflux_alt)
+	if len(Tflux_alt) > 3:
+		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux_alt[:,0]), log10(Tflux_alt[:,1]))
+		features += [slope, r_value]
+	else:
+		features += [numpy.nan, numpy.nan]
 	
 	if len(redratioseries) > 1:
 		tred, redratio = numpy.transpose(redratioseries)

@@ -1,6 +1,9 @@
 from __future__ import print_function, division
 from alltrain import *
 
+train_columns = list(train.columns)
+del train
+
 # for random forests the transformation should not matter.
 #qt = QuantileTransformer()
 #X = qt.fit_transform(X)
@@ -41,7 +44,7 @@ def train_and_evaluate(name, clf):
 			print("Feature ranking:")
 
 			for f, index in enumerate(indices):
-				print("%d. feature %d (%f) -- %s" % (f + 1, index, importances[index], train.columns[index]))
+				print("%d. feature %d (%f) -- %s" % (f + 1, index, importances[index], train_columns[index]))
 				if importances[indices[f]] < importances[indices[0]] / 100.0:
 					break
 
@@ -90,9 +93,9 @@ if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 	print("Feature ranking:")
 	fcols = open('important_columns1.txt', 'w')
 	for f, index in enumerate(indices):
-		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train.columns[index]))
+		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train_columns[index]))
 		if rfe.ranking_[index] == 1:
-			fcols.write("%d\t%s\n" % (index,train.columns[index]))
+			fcols.write("%d\t%s\n" % (index,train_columns[index]))
 	
 	premask = rfe.ranking_ <= 4
 	#premask = rfe.ranking_ > 0
@@ -112,9 +115,9 @@ if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 	fcols = open('important_columns2.txt', 'w')
 	for f, index in enumerate(indices):
 		oldindex = numpy.where(premask)[0][index]
-		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train.columns[oldindex]))
+		print("%d. feature %d (%d) -- %s" % (f + 1, index, rfe.ranking_[index], train_columns[oldindex]))
 		if rfe.ranking_[index] == 1:
-			fcols.write("%d\t%s\n" % (index,train.columns[oldindex]))
+			fcols.write("%d\t%s\n" % (index, train_columns[oldindex]))
 	
 	sys.exit(0)
 
