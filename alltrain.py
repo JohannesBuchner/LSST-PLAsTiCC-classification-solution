@@ -55,17 +55,19 @@ if simplify_space:
 	column_mask = numpy.array([c in important_columns and c not in blacklist_columns
 		for c in train.columns if c not in ('object_id', 'target')])
 	X = X[:,column_mask]
+	assert len(train.columns[column_mask]) == X.shape[1]
 else:
 	column_mask = numpy.array([True for c in train.columns])
 
 # imputing also removes columns which have no useful values, so we need to know those
-valid_column_mask = numpy.logical_and(column_mask, valid_columns)
 #imp = SimpleImputer(missing_values=numpy.nan, strategy='mean', copy=False)
 #imp = SimpleImputer(missing_values=numpy.nan, strategy='constant', fill_value=-99, copy=False)
 impute = os.environ.get('IMPUTE', '1') == '1'
 if impute:
+	valid_column_mask = numpy.logical_and(column_mask, valid_columns)
 	imp = SimpleImputer(missing_values=numpy.nan, strategy='median', copy=False)
 else:
+	valid_column_mask = column_mask
 	class NoImpute(object):
 		def fit_transform(self, X): return X
 		def transform(self, X): return X
