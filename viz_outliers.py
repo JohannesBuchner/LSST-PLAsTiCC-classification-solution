@@ -3,22 +3,20 @@ from alltrain import *
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-X_galmask = train.hostgal_photoz.values == 0
+del train
+
 X = mytransformer.fit_transform(X)
-print('gal/exgal:', X_galmask.sum(), (~X_galmask).sum())
-#label_colors = list(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
 execute = unknown_data_file is not None
-unknown_galmask = None
 unknown = None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
 	unknown.pop('object_id')        
-	unknown_galmask = unknown.hostgal_photoz.values == 0
-	print('gal/exgal:', unknown_galmask.sum(), (~unknown_galmask).sum())
 	unknown = unknown.values
 	print('unknown:', unknown.shape)
-	unknown[~numpy.isfinite(unknown)] = -99
+	if simplify_space:
+		unknown = unknown[:,column_mask]
+	unknown = imp.transform(unknown)
 	unknown = mytransformer.transform(unknown)
 
 def make_transform(name, tsne, X, Y, Z):
@@ -54,30 +52,33 @@ def make_transform(name, tsne, X, Y, Z):
 	plt.savefig('viz_%s.pdf' % name)
 	plt.close()
 
-def train_and_evaluate(name, tsne):
-	make_transform(name + '_exgal', tsne, X_white[~X_galmask,:], Y[~X_galmask], 
-		unknown_white[~unknown_galmask,:] if unknown is not None else None)
-	make_transform(name + '_gal', tsne, X_white[X_galmask,:], Y[X_galmask], 
-		unknown_white[unknown_galmask,:] if unknown is not None else None)
-	#make_transform(name + '_all', tsne, X_white, Y, unknown_white)
-	return tsne
 
 n_components = int(os.environ.get('NPCACOMP', '40'))
 perplexity = int(os.environ.get('PERPLEXITY', '30'))
 
-prefix = transform + '-PCA%d-' % n_components
-print("dimensionality reduction with %s ..." % prefix)
-t0 = time()
-pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True)
-X_white = pca.fit_transform(X)
-print("done in %0.3fs" % (time() - t0))
-print('PCA Variance ratios:', pca.explained_variance_ratio_)
-#X_white = pca.transform(X)
-del X
-if execute:
-	unknown_white = pca.transform(unknown)
-	del unknown
-train_and_evaluate(prefix + 'TSNE%d' % perplexity, tsne = TSNE(perplexity=perplexity, n_iter=5000))
+if n_components > 0:
+	prefix = transform + '-PCA%d-' % n_components
+	print("dimensionality reduction with %s ..." % prefix)
+	t0 = time()
+	pca = PCA(n_components=n_components, svd_solver='randomized', whiten=True)
+	X_white = pca.fit_transform(X)
+	print("done in %0.3fs" % (time() - t0))
+	print('PCA Variance ratios:', pca.explained_variance_ratio_)
+	#X_white = pca.transform(X)
+	del X
+	if execute:
+		unknown_white = pca.transform(unknown)
+		del unknown
+	else:
+		unknown_white = None
+else:
+	prefix = transform + '-'
+	X_white = X
+	unknown_white = unknown
+
+tsne = TSNE(perplexity=perplexity, n_iter=5000)
+make_transform(prefix + 'TSNE%d' % perplexity, tsne, X_white, Y, unknown_white)
+
 
 
 

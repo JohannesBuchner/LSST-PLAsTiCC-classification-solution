@@ -51,14 +51,26 @@ valid_columns = numpy.array([numpy.isfinite(X[:,i]).any() for i in range(X.shape
 simplify_space = os.environ.get('SIMPLIFY', '0') == '1'
 if simplify_space:
 	important_columns = set([line.split()[1] for line in open('important_columns.txt')])
-	column_mask = numpy.array([c in important_columns for c in train.columns if c not in ('object_id', 'target')])
+	blacklist_columns = set([line.strip() for line in open('blacklist_features.txt')])
+	column_mask = numpy.array([c in important_columns and c not in blacklist_columns
+		for c in train.columns if c not in ('object_id', 'target')])
 	X = X[:,column_mask]
 else:
 	column_mask = numpy.array([True for c in train.columns])
 
 # imputing also removes columns which have no useful values, so we need to know those
 valid_column_mask = numpy.logical_and(column_mask, valid_columns)
-imp = SimpleImputer(missing_values=numpy.nan, strategy='mean', copy=False)
+#imp = SimpleImputer(missing_values=numpy.nan, strategy='mean', copy=False)
+#imp = SimpleImputer(missing_values=numpy.nan, strategy='constant', fill_value=-99, copy=False)
+impute = os.environ.get('IMPUTE', '1') == '1'
+if impute:
+	imp = SimpleImputer(missing_values=numpy.nan, strategy='median', copy=False)
+else:
+	class NoImpute(object):
+		def fit_transform(self, X): return X
+		def transform(self, X): return X
+	imp = NoImpute()
+
 #X[~numpy.isfinite(X)] = -99
 X = imp.fit_transform(X)
 

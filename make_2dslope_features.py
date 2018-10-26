@@ -57,7 +57,6 @@ def LC_slope_singlefit(time, flux, flux_error, z):
 		tintercept = time_bs[peak]
 		peak_intercept = flux_bs[peak]
 	
-	t = numpy.linspace(numpy.min(time_bs)-10, numpy.max(time_bs)+10, 10)
 	return peakflux, tintercept, lresult[0], rresult[0]
 
 
@@ -120,6 +119,7 @@ def fit_logplanetilt(x, y, z):
 # in units of nm
 Tmin = 100
 Tmax = 10000
+wavenorm = 400 # evaluate the SED at 400nm rest-frame
 
 Twave_grid = numpy.logspace(2, 4, 40).reshape((-1,1))
 def bbody_fit(wave, flux):
@@ -144,8 +144,8 @@ def bbody_fit(wave, flux):
 	chi2 = (((flux - s.reshape((-1,1)) * flux_model) / flux_error)**2).sum(axis=1)
 	assert len(chi2) == len(Twave_grid), (chi2.shape, Twave_grid.shape)
 	i = numpy.argmin(chi2)
-	chi2best = chi2[i]
-	best = [Twave_grid[i], s[i]]
+	chi2best = float(chi2[i])
+	best = [float(Twave_grid[i]), float(s[i])]
 	
 	return best + [slope, chi2best - chi2_PL]
 
@@ -308,9 +308,9 @@ for color in 'ugrizY':
 	for c in "leftslope, leftvar, leftconc, rightslope, rightvar, rightconc, peakfluxi".split(', '):
 		header += "%s_%s_median,%s_%s_iqr," % (color, c, color, c)
 	header += "%s_peakcolor,%s_peakcolori," % (color, color)
+
 columns = """
 Tflux_slope, Tflux_corr,
-Tflux_slope_alt, Tflux_corr_alt,
 redrise, redfall,
 bluerise, bluefall,
 phi_rise, theta_rise, evolrise,
@@ -419,7 +419,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
 
 			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
-			Tflux.append([Twave, flux400])
+			Tflux.append([float(Twave), float(flux400)])
 			
 			Tseries.append([trest, Twave, slope, chi2diff])
 			if tpeak_lo is not None and trest < tpeak_lo:
@@ -439,16 +439,9 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			if tpeak_hi_alt is not None and trest_alt > tpeak_hi_alt:
 				Tfall_alt.append(Twave)
 	
-	Tflux = numpy.array(Tflux)
-	if len(Tflux_alt) > 3:
-		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux[:,0]), log10(Tflux[:,1]))
-		features += [slope, r_value]
-	else:
-		features += [numpy.nan, numpy.nan]
-	
-	Tflux_alt = numpy.array(Tflux_alt)
-	if len(Tflux_alt) > 3:
-		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux_alt[:,0]), log10(Tflux_alt[:,1]))
+	if len(Tflux) > 3:
+		Tflux = numpy.array(Tflux)
+		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux[:,0] / 4000), log10(Tflux[:,1]))
 		features += [slope, r_value]
 	else:
 		features += [numpy.nan, numpy.nan]
@@ -522,7 +515,6 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	if len(peakfluxes) > 2:
 		peakfluxes = numpy.asarray(peakfluxes)
 		Twave, s, slope, chi2diff = bbody_fit(peakfluxes[:,0], peakfluxes[:,1] / numpy.nanmax(peakfluxes[:,1]))
-		wavenorm = 400 # evaluate the SED at 400nm rest-frame
 		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
 		features += [Twave, flux400]
 		
