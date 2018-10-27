@@ -42,8 +42,9 @@ if 64 in class_weights:
 	class_weights[64] = class_weights[64] * 2
 if 15 in class_weights:
 	class_weights[15] = class_weights[15] * 2
-#print("Class weights:", class_weights)
-#print("Class numbers:", list(zip(N_labels, labels)))
+class_weights = 'balanced'
+print("Class weights:", class_weights)
+print("Class numbers:", list(zip(labels, N_labels)))
 weights_targets = numpy.zeros(100)
 for l, N in zip(labels, N_labels):
 	weights_targets[l] = 1. / (N + 0.1)

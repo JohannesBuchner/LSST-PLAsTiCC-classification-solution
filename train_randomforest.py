@@ -132,9 +132,9 @@ train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=1
 train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40, class_weight=class_weights))
 train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100, class_weight=class_weights))
 train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400, class_weight=class_weights))
-train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40, class_weight=class_weights))
-train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400, class_weight=class_weights))
-train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40, class_weight=class_weights))
+train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
+train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
+train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40))
 #train_and_evaluate('RandomForest4000', clf = RandomForestClassifier(n_estimators=4000))
 
 # TODO:
