@@ -86,6 +86,15 @@ galactic:
 92:
 
 
+TODO
+-----
+
+* Merge results
+* Try also again resampled
+* Try again gal-dip gal-nodip exgal 
+* Redo feature subsets
+* Submit: {SVM,RandomForest400}-{normal,resampled} (outliers: 0.1, no flattening, prior=1%)
+* Submit: NaiveBayes-normal
 
 Machine learning
 -------------------

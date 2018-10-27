@@ -47,10 +47,10 @@ for i, colname in enumerate(columns):
 	for label in encoder.classes_:
 		mask = Y == label
 		if mask.any():
-			plt.hist(Xcol[mask], cumulative=True, bins=1000, normed=True,
+			plt.hist(Xcol[mask], cumulative=True, bins=1000, density=True,
 				histtype='step', label='Class %d' % label)
 	if execute:
-		plt.hist(Ycol, cumulative=True, bins=1000, normed=True,
+		plt.hist(Ycol, cumulative=True, bins=1000, density=True,
 			histtype='step', label='unknown')
 		plt.xlim(max(Ycol.min(), Xmed - (Xhi - Xmed)*3), min(Ycol.max(), Xmed + (Xhi - Xmed)*3))
 	plt.xlabel(colname)

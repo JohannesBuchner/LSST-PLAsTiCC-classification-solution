@@ -36,6 +36,14 @@ labels = encoder.classes_
 #N_labels, _ = numpy.histogram(Y_orig, bins=labels)
 N_labels = numpy.array([(Y_orig == l).sum() for l in labels])
 # https://www.kaggle.com/c/PLAsTiCC-2018/discussion/67194
+# compute class weights inversely proportional to frequency
+class_weights = {l: len(Y_orig) / (len(labels) * (Y_orig == l).sum()) for l in labels}
+if 64 in class_weights:
+	class_weights[64] = class_weights[64] * 2
+if 15 in class_weights:
+	class_weights[15] = class_weights[15] * 2
+#print("Class weights:", class_weights)
+#print("Class numbers:", list(zip(N_labels, labels)))
 weights_targets = numpy.zeros(100)
 for l, N in zip(labels, N_labels):
 	weights_targets[l] = 1. / (N + 0.1)

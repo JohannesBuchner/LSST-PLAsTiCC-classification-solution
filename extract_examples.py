@@ -306,7 +306,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 				numpy.mean(runlengths_down), numpy.std(runlengths_down), 
 				]
 			plt.figure("dist")
-			plt.hist(numpy.log10(flux / numpy.median(flux)), cumulative=True, bins=100, normed=True, histtype='step')
+			plt.hist(numpy.log10(flux / numpy.median(flux)), cumulative=True, bins=100, density=True, histtype='step')
 			
 		
 		# create features

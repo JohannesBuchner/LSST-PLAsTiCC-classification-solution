@@ -291,7 +291,7 @@ for object_id in map(int, sys.argv[2:]):
 				numpy.mean(runlengths_down), numpy.std(runlengths_down), 
 				]
 			plt.figure("dist")
-			plt.hist(numpy.log10(flux / numpy.median(flux)), cumulative=True, bins=100, normed=True, histtype='step')
+			plt.hist(numpy.log10(flux / numpy.median(flux)), cumulative=True, bins=100, density=True, histtype='step')
 			plt.xlabel('Flux')
 			plt.savefig(fileprefix + 'dist.pdf', bbox_inches='tight')
 			plt.close()

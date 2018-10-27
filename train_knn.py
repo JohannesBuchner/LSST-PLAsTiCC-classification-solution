@@ -77,8 +77,8 @@ for n_components in 10, 40, 100:
 
 	#train_and_evaluate(prefix + 'NC', clf = NearestCentroid())
 	train_and_evaluate(prefix + 'LDA', clf = LinearDiscriminantAnalysis())
-	train_and_evaluate(prefix + 'SVC-default', clf = SVC(probability=True))
-	train_and_evaluate(prefix + 'SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05))
+	train_and_evaluate(prefix + 'SVC-default', clf = SVC(probability=True, class_weight=class_weights))
+	train_and_evaluate(prefix + 'SVC-0.1', clf = SVC(probability=True, C = 0.1, gamma = 0.05, class_weight=class_weights))
 
 	train_and_evaluate(prefix + 'KNN2', clf = KNeighborsClassifier(n_neighbors=2))
 	train_and_evaluate(prefix + 'KNN4', clf = KNeighborsClassifier(n_neighbors=4))

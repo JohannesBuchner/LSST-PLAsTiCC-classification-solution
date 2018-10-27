@@ -77,7 +77,7 @@ def train_and_evaluate(name, clf):
 
 
 if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
-	clf = RandomForestClassifier(n_estimators=100)
+	clf = RandomForestClassifier(n_estimators=100, class_weight=class_weights)
 	from sklearn.feature_selection import RFE, RFECV
 	from sklearn.model_selection import StratifiedKFold
 	print("Recursive feature elimination with RandomForest100...")
@@ -101,7 +101,7 @@ if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 	#premask = rfe.ranking_ > 0
 	Z = mytransformer.fit_transform(X[:,premask])
 	print("Recursive feature elimination with SVC...")
-	clf = LinearSVC(max_iter=10000)
+	clf = LinearSVC(max_iter=10000, class_weight=class_weights)
 	t0 = time()
 	rfe = RFE(estimator=clf, n_features_to_select=30, step=0.1, verbose=2)
 	#rfe = RFECV(estimator=clf, min_features_to_select=10, step=0.1, verbose=2, 
@@ -127,14 +127,14 @@ if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 #train_and_evaluate('KNN40', clf = KNeighborsClassifier(n_neighbors=40))
 
 #train_and_evaluate('XGradientBoosting', clf = XGBClassifier(n_estimators=40))
-train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4))
-train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10))
-train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40))
-train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100))
-train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400))
-train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40))
-train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400))
-train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40))
+train_and_evaluate('RandomForest4', clf = RandomForestClassifier(n_estimators=4, class_weight=class_weights))
+train_and_evaluate('RandomForest10', clf = RandomForestClassifier(n_estimators=10, class_weight=class_weights))
+train_and_evaluate('RandomForest40', clf = RandomForestClassifier(n_estimators=40, class_weight=class_weights))
+train_and_evaluate('RandomForest100', clf = RandomForestClassifier(n_estimators=100, class_weight=class_weights))
+train_and_evaluate('RandomForest400', clf = RandomForestClassifier(n_estimators=400, class_weight=class_weights))
+train_and_evaluate('AdaBoost40', clf = AdaBoostClassifier(n_estimators=40, class_weight=class_weights))
+train_and_evaluate('AdaBoost400', clf = AdaBoostClassifier(n_estimators=400, class_weight=class_weights))
+train_and_evaluate('ExtraTrees40', clf = ExtraTreesClassifier(n_estimators=40, class_weight=class_weights))
 #train_and_evaluate('RandomForest4000', clf = RandomForestClassifier(n_estimators=4000))
 
 # TODO:
