@@ -102,15 +102,10 @@ for name in [prefix + '-Kmeans%d' % k]:#, prefix + '-HierCluster%d' % k]:
 
 	print("making predictions...")
 	pred = reassign_mapping(name, X, Y, unknown, pca=pca, clf=clf)
-	filename = 'prediction_out_%s_flatness%s_prior%s_outliers%s.csv.gz' % (name, PROB_FLATNESS, FLATPRIOR_STRENGTH, OUTLIERS_STRENGTH)
+	filename = unknown_data_file + '_predictions_%s_flatness%s_prior%s_outliers%s.csv.gz' % (name, PROB_FLATNESS, FLATPRIOR_STRENGTH, OUTLIERS_STRENGTH)
 	print("storing under '%s' ..." % filename)
-	numpy.savetxt(filename,
-		numpy.hstack((unknown_object_ids.reshape((-1,1)), pred)), 
-		fmt='%d' + ',%.3e' * len(classes),
-		delimiter=',', 
-		header='object_id,class_6,class_15,class_16,class_42,class_52,class_53,class_62,class_64,class_65,class_67,class_88,class_90,class_92,class_95,class_99',
-		comments='')
-	
+	write_prediction(filename, unknown_object_ids, pred)
+
 
 
 

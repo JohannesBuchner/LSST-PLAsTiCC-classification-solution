@@ -53,11 +53,11 @@ def train_and_evaluate(name, clf):
 		print('predictions for training data...')
 		sys.stdout.flush()
 		predictions = cross_val_predict(clf, X_white, Y, cv=4, method='predict_proba', n_jobs=4)
-		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
+		write_prediction(training_data_file + '_predictions_%s.csv.gz' % name, training_object_ids, predictions)
 		clf.fit(X_white, Y)
 		predictions = clf.predict_proba(unknown_white)
 		print('predictions for unknown data...')
-		numpy.savetxt(unknown_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
+		write_prediction(unknown_data_file + '_predictions_%s.csv.gz' % name, unknown_object_ids, predictions)
 		print('predictions done after %.1fs' % (time() - t0))
 	sys.stdout.flush()
 	return clf

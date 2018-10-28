@@ -11,7 +11,7 @@ del train
 execute = unknown_data_file is not None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
-	unknown.pop('object_id')        
+	unknown_object_ids = unknown.pop('object_id').values
 	unknown = unknown.values
 	print('unknown:', unknown.shape)
 	unknown = imp.transform(unknown)
@@ -67,11 +67,11 @@ def train_and_evaluate(name, clf):
 		t0 = time()
 		print('predictions for training data...')
 		predictions = cross_val_predict(clf, X, Y, cv=4, method='predict_proba', n_jobs=4)
-		numpy.savetxt(training_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
+		write_prediction(training_data_file + '_predictions_%s.csv.gz' % name, training_object_ids, predictions)
 		clf.fit(X, Y)
 		predictions = clf.predict_proba(unknown)
 		print('predictions for unknown data...')
-		numpy.savetxt(unknown_data_file + '_predictions_%s.csv.gz' % name, predictions, delimiter=',', fmt='%.4e')
+		write_prediction(unknown_data_file + '_predictions_%s.csv.gz' % name, unknown_object_ids, predictions)
 		print('predictions done after %.1fs' % (time() - t0))
 	return clf
 
