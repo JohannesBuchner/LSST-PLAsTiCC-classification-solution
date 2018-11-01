@@ -1,24 +1,37 @@
 from __future__ import print_function, division
-from collections import defaultdict
 import os
 import numpy
 import pandas
-from collections import defaultdict
 
 #a = pandas.read_csv('training_set.csv')
 b = pandas.read_csv('training_set_metadata.csv')
 #a = a.set_index('object_id')
 b = b.set_index('object_id')
+numpy.random.seed(1)
 
 targets  = numpy.unique(b.target.values)
 nhave    = {t:(b.target == t).sum() for t in targets}
 nhaveddf = {t:numpy.logical_and(b.ddf == 1, b.target == t).sum() for t in targets}
 ntarget  = 400
 uppertarget  = 1000
-oversample_rates = {target:min(20, max(0, int((ntarget - nhave[target] + 0.2) / nhaveddf[target]))) for target in targets}
-hypersample_rates = {target: max(0, (ntarget - nhave[target] - nhaveddf[target] * oversample_rates[target]) / nhave[target]) for target in targets}
-undersample_rates = {target: uppertarget * 1. / nhave[target] for target in targets}
+oversample_rates = {target:min(20, max(3, int((ntarget - nhave[target] + 0.2) / nhaveddf[target]))) for target in targets}
+#hypersample_rates = {target: max(0, (ntarget - nhave[target] - nhaveddf[target] * oversample_rates[target]) / nhave[target]) for target in targets}
+#undersample_rates = {target: uppertarget * 1. / nhave[target] for target in targets}
 
+# for resampling time cadence
+a = pandas.read_csv('training_set.csv', usecols=['object_id', 'mjd'])
+a = a.set_index('object_id')
+alldeltas = []
+for object_id, object_data in a.groupby(a.index.get_level_values(0)):
+	time = object_data['mjd'].values
+	deltat = time[1:] - time[:-1]
+	alldeltas += deltat[deltat > 0.5].tolist()
+del a
+alldeltas = numpy.sort(alldeltas)
+
+
+
+# for resampling redshift
 c = pandas.read_csv('test_set_metadata.csv')
 mask = c.hostgal_specz > 0
 specz = c.hostgal_specz[mask].values
@@ -35,8 +48,6 @@ for zi, speczi in zip(zindex, specz):
 zdists = [numpy.sort(zdist) for zdist in zdists]
 
 def sample_photoz(photozi, photozi_err, Nsamples=None):
-	# original:
-	# return numpy.random.normal(photozi, photozi_err, size=Nsamples)
 	# draw from empirical distribution
 	zindexi = int(numpy.log10(photozi+1) * Nz / 0.5)
 	zindexi = max(0, min(Nz-1, zindexi))
@@ -44,17 +55,19 @@ def sample_photoz(photozi, photozi_err, Nsamples=None):
 	znew = numpy.random.choice(zdist, replace=True, size=Nsamples)
 	#print(photozi, '->', znew)
 	return znew
+	# original:
+	# return numpy.random.normal(photozi, photozi_err, size=Nsamples)
 
 print("number of objects in each class:")
 print(' '.join(['%4d' % nhave[target] for target in targets]))
 print("number of DDF objects in each class:")
 print(' '.join(['%4d' % nhaveddf[target] for target in targets]))
-print("undersampling factor for each class:")
-print(' '.join(['%.2f' % undersample_rates[target] for target in targets]))
+#print("undersampling factor for each class:")
+#print(' '.join(['%.2f' % undersample_rates[target] for target in targets]))
 print("oversampling factor for each class:")
 print(' '.join(['%4d' % oversample_rates[target] for target in targets]))
-print("hypersampling for each class:")
-print(' '.join(['%.2f' % hypersample_rates[target] for target in targets]))
+#print("hypersampling for each class:")
+#print(' '.join(['%.2f' % hypersample_rates[target] for target in targets]))
 
 stream_meta = open('training_set_metadata.csv')
 outstream_meta = open('resampled_training_set_metadata.csv', 'w')
@@ -73,6 +86,15 @@ def add_noise(metaline):
 	mwebv = '%f' % max(0, numpy.random.normal(float(mwebv), 0.01))
 	
 	return ',' + ','.join([ra,decl,gal_l,gal_b,ddf,hostgal_specz,hostgal_photoz,hostgal_photoz_err,distmod,mwebv,target])
+
+def resample_data(input_lines):
+	output_lines = []
+	for input_line in input_lines:
+		mjd, passband, flux, flux_err, detected = input_line[1:].split(',')
+		flux = '%f' % (numpy.random.normal(float(flux), float(flux_err)))
+		output_line = ',' + ','.join([mjd, passband, flux, flux_err, detected])
+		output_lines.append(output_line)
+	return output_lines
 
 stream_data = open('training_set.csv')
 outstream_data = open('resampled_training_set.csv', 'w')
@@ -94,43 +116,22 @@ for line in stream_data:
 			time_all = numpy.array(input_times)
 
 			noversample = oversample_rates[target]
-			hypersample = False
-			if not is_ddf:
-				hypersample = hypersample_rates[target]
-				noversample = 0
-			
 			out_groups = [(last_object_id, input_lines)]
 			j = 1
 			
+			last_ti = 0
 			for i in range(noversample):
-				# select randomly 1-3 observations with a band of 3 nights, choose those nights.
-				nobs = 2
-				iobs_sel = numpy.random.randint(0, len(time_all), size=nobs)
-				mask_sel = numpy.zeros(len(time_all), dtype=bool)
-				for ti in time_all[iobs_sel]:
-					mask_sel[numpy.logical_and(ti < time_all + 2.5, ti > time_all - 0.5)] = True
+				# skip beginning or end
+				t0 = time_all[0] + numpy.random.choice(alldeltas) - 0.1
+				t1 = time_all[-1] - numpy.random.choice(alldeltas) - 0.1
+				mask_sel = numpy.logical_and(time_all >= t0, time_all <= t1)
 				if mask_sel.sum() > 4:
 					iobs_sel = numpy.where(mask_sel)[0]
-					out_groups.append((str(1000000000 * (j+1) + int(last_object_id)), [input_lines[i] for i in iobs_sel]))
+					out_groups.append((str(1000000000 * (j+1) + int(last_object_id)), resample_data([input_lines[i] for i in iobs_sel])))
 					j += 1
 			
-			if hypersample > 0:
-				last_ti = 0
-				#for iobs_sel in range(len(time_all)):
-				for iobs_sel in numpy.unique(numpy.random.randint(len(time_all), size=numpy.random.poisson(hypersample))):
-					# remove a single night from a non-DDF observation
-					ti = time_all[iobs_sel]
-					if ti < last_ti + 0.5:
-						continue
-					ti = last_ti
-					mask_sel = ~numpy.logical_and(ti < time_all + 0.5, ti > time_all - 0.5)
-					if mask_sel.sum() > 4:
-						iobs_sel = numpy.where(mask_sel)[0]
-						out_groups.append((str(1000000000 * (j+1) + int(last_object_id)), [input_lines[i] for i in iobs_sel]))
-						j += 1
-			
-			if numpy.random.uniform() > undersample_rates[target]:
-				out_groups = []
+			#if numpy.random.uniform() > undersample_rates[target]:
+			#	out_groups = []
 			
 			for prefix, lines in out_groups:
 				for line in lines:
