@@ -99,7 +99,7 @@ else:
 
 def write_prediction(filename, object_ids, proba, outlierproba=None):
 	i = 0
-	all_classes = [6,15,16,42,52,53,62,64,65,67,88,90,92,99]
+	all_classes = [6,15,16,42,52,53,62,64,65,67,88,90,92,95,99]
 	df = pandas.DataFrame()
 	df['object_id'] = object_ids
 	for j, cls in enumerate(all_classes):
@@ -110,12 +110,12 @@ def write_prediction(filename, object_ids, proba, outlierproba=None):
 			v = numpy.zeros(len(proba))
 		df['class_%d' % cls] = v
 	if outlierproba is not None:
-		df['class_99' % cls] = outlierproba
+		df['class_99'] = outlierproba
 	
 	#header = "object_id," + ','.join(['class_%d' % cls for cls in all_classes])
 	#numpy.savetxt(filename, proba_all, delimiter=',', fmt='%d' + ',%.4e'*15, 
 	#	header=header, comments='')
-	df.to_csv(filename, index=False, float_format='%.4e')
+	df.to_csv(filename, index=False, float_format='%.4e', compression='gzip')
 
 def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None):
 	transformed_labels = encoder.transform(y_true)
