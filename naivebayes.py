@@ -13,12 +13,58 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import euclidean_distances
 import scipy.stats
 
+import joblib
+from joblib import Parallel, delayed
+
 def plothist(x, label):
 	x = x[numpy.isfinite(x)]
 	if x.max() > x.min():
 		plt.hist(x, bins=1000, histtype='step', density=True, cumulative=True, label=label)
 	else:
 		plt.vlines(x, 0, 1, label=label)
+
+def _make_single_mixture(x, Ngauss_init):
+	# split CDF into segments. In each segment, put a gaussian
+	# the benefit is that this supports multi-modality easily
+	# and the parts should have equal weight already.
+	q =  [i * 100.0 / Ngauss_init for i in range(1, Ngauss_init)]
+	percentiles = numpy.percentile(x, [0] + q + [100]).astype(float)
+	# avoid too small widths, which can occur with fake values
+	mincov = ((percentiles[-1] - percentiles[0]) / 100.0)**2
+	
+	means = ((percentiles[1:] + percentiles[:-1]) / 2.).reshape((Ngauss_init, 1))
+	covs  = ((percentiles[1:] - percentiles[:-1])**2).reshape((Ngauss_init, 1, 1))
+	covs[~(covs > mincov)] = mincov
+	return means, covs
+	
+	# a sequence of Ngauss_init next to each other
+	lo, hi = x.min(), x.max()
+	means = numpy.linspace(lo, hi, Ngauss_init).reshape((-1,1))
+	covs = [numpy.array([[(hi - lo)**2]])] * Ngauss_init
+	return means, covs
+
+def _make_mixture_for_column(colname, col, verbose, Ngauss_init, nmin_multigauss, VB_iter):
+	col = col[numpy.isfinite(col)]
+	std = col.std()
+	if len(col) == 0 or not(std > 0): # no useful samples
+		if verbose > 0: print('    column %s: no data' % colname)
+		return None
+	elif len(col) < nmin_multigauss or VB_iter == 0:
+		if verbose > 0: print('    column %s: %s +- %s' % (colname, col.mean(), std))
+		return create_gaussian_mixture(numpy.array([[col.mean()]], dtype=float), [numpy.array([[std]], dtype=float)])
+	else:
+		means, covs = _make_single_mixture(col, Ngauss_init)
+		mix = create_gaussian_mixture(means, covs)
+		
+		if verbose > 0: print('    column %s: running VB...' % colname)
+		vb = GaussianInference(col.reshape(-1,1), 
+			initial_guess=mix, W0=numpy.eye(1)*1e10)
+		vb_prune = 0.5 * len(vb.data) / vb.K
+		vb.run(VB_iter, rel_tol=1e-8, abs_tol=1e-5, 
+			prune=vb_prune, verbose=verbose > 1)
+		mix = vb.make_mixture()
+		return mix
+
 
 class MultiGaussNaiveBayesClassifier(BaseEstimator, ClassifierMixin):
 	"""
@@ -37,7 +83,8 @@ class MultiGaussNaiveBayesClassifier(BaseEstimator, ClassifierMixin):
 	"""
 	def __init__(self, all_labels=None, nmin_multigauss=10, Ngauss_init=5, 
 		VB_iter=1000, noteworthy_information = 100, 
-		plot_prefix = None, column_names = None, verbose=0):
+		plot_prefix = None, column_names = None, verbose=0,
+		parallel = None):
 		"""
 		all_labels: class labels to consider. 
 			If None (default), taken from y in fit().
@@ -61,6 +108,20 @@ class MultiGaussNaiveBayesClassifier(BaseEstimator, ClassifierMixin):
 			This parameter sets the threshold (in nats).
 		
 		plot_prefix:
+			If set, create distribution plots for useful features
+			showing the class distribution and the VB approximation.
+		
+		column_names:
+			names of the features
+		
+		verbose:
+			if 0: silent
+			if 1: print usefulness information on each feature and ongoing computations
+			if 2: like 1, but give also details on VB progress
+		
+		parallel:
+			joblib.Parallel object for parallelisation
+			If set to None (default), no parallelisation is performed
 			
 		
 		column_names:
@@ -77,56 +138,23 @@ class MultiGaussNaiveBayesClassifier(BaseEstimator, ClassifierMixin):
 		self.column_names = column_names
 		self.islogvar = None
 		self.verbose = verbose
-		pass
-	
-	def _make_single_mixture(self, x):
-		# split CDF into segments. In each segment, put a gaussian
-		# the benefit is that this supports multi-modality easily
-		# and the parts should have equal weight already.
-		q =  [i * 100.0 / self.Ngauss_init for i in range(1, self.Ngauss_init)]
-		percentiles = numpy.percentile(x, [0] + q + [100]).astype(float)
-		# avoid too small widths, which can occur with fake values
-		mincov = ((percentiles[-1] - percentiles[0]) / 100.0)**2
-		
-		means = ((percentiles[1:] + percentiles[:-1]) / 2.).reshape((self.Ngauss_init, 1))
-		covs  = ((percentiles[1:] - percentiles[:-1])**2).reshape((self.Ngauss_init, 1, 1))
-		covs[~(covs > mincov)] = mincov
-		return means, covs
-		
-		# a sequence of Ngauss_init next to each other
-		lo, hi = x.min(), x.max()
-		means = numpy.linspace(lo, hi, self.Ngauss_init).reshape((-1,1))
-		covs = [numpy.array([[(hi - lo)**2]])] * self.Ngauss_init
-		return means, covs
+		self.parallel = None
 	
 	def _make_mixture(self, x, colnames = None):
 		if colnames is None:
 			colnames = ['col%d' % (i+1) for i in range(x.shape[1])]
 		assert len(colnames) == x.shape[1], (colnames, x.shape[1])
-		feature_distributions = []
-		for i, colname in enumerate(colnames):
-			col = x[:,i]
-			col = col[numpy.isfinite(col)]
-			std = col.std()
-			if len(col) == 0 or not(std > 0): # no useful samples
-				if self.verbose > 0: print('    column %s: no data' % colname)
-				mix = None
-			elif len(col) < self.nmin_multigauss or self.VB_iter == 0:
-				if self.verbose > 0: print('    column %s: %s +- %s' % (colname, col.mean(), std))
-				mix = create_gaussian_mixture(numpy.array([[col.mean()]], dtype=float), [numpy.array([[std]], dtype=float)])
-			else:
-				means, covs = self._make_single_mixture(col)
-				mix = create_gaussian_mixture(means, covs)
-				
-				if self.verbose > 0: print('    column %s: running VB...' % colname)
-				vb = GaussianInference(col.reshape(-1,1), 
-					initial_guess=mix, W0=numpy.eye(1)*1e10)
-				vb_prune = 0.5 * len(vb.data) / vb.K
-				vb.run(self.VB_iter, rel_tol=1e-8, abs_tol=1e-5, 
-					prune=vb_prune, verbose=self.verbose > 1)
-				mix = vb.make_mixture()
-			feature_distributions.append(mix)
-		return feature_distributions
+		
+		if self.parallel is None:
+			return [_make_mixture_for_column(colname, col, 
+				verbose=self.verbose, Ngauss_init=self.Ngauss_init, 
+				nmin_multigauss=self.nmin_multigauss, VB_iter=self.VB_iter) 
+				for colname, col in zip(colnames, x.transpose())]
+		else:
+			return list(self.parallel(delayed(_make_mixture_for_column)(
+				colname, col, verbose=self.verbose, Ngauss_init=self.Ngauss_init, 
+				nmin_multigauss=self.nmin_multigauss, VB_iter=self.VB_iter)
+				for colname, col in zip(colnames, x.transpose())))
 	
 	def _evaluate_feature_dist(self, feature_distributions, x, logprior):
 		assert len(feature_distributions) == x.shape[1], (len(feature_distributions), x.shape)
