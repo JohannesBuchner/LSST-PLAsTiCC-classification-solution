@@ -7,7 +7,7 @@ X = mytransformer.fit_transform(X)
 execute = unknown_data_file is not None
 if execute:
 	unknown = pandas.read_csv(unknown_data_file)
-	unknown.pop('object_id')
+	unknown_object_ids = unknown.pop('object_id').values
 	unknown = unknown.values
 	print('unknown:', unknown.shape)
 	if simplify_space:
