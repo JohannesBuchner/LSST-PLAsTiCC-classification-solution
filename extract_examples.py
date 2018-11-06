@@ -450,7 +450,7 @@ plt.xlabel('Restframe Wavelength [nm]')
 plt.ylabel('Flux')
 plt.yscale('log')
 plt.xscale('log')
-plt.savefig(fileprefix + 'SED.pdf', bbox_inches='tight')
+plt.savefig(fileprefix + 'SEDpeak.pdf', bbox_inches='tight')
 plt.close()
 
 print("making SED evolution plot ...")
