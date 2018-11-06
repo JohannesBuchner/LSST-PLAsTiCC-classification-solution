@@ -351,7 +351,18 @@ The clusters highlighted with `***` have no training set members.
 --------------------------
 
 Now we want to combine novelty detection or fixed outlier fractions with our
-hyperpredictor (or another method).
+hyperpredictor (or another method).::
+
+	┌─────────────────────────────────┐
+	│       Classifying Method        │ 
+	│       (e.g. RandomForest)       │ ───┐
+	└─────────────────────────────────┘    │    ┌─────────────┐
+	                                       ├──> │    Blend    │ ─> submit
+	┌─────────────────────────────────┐    │    └─────────────┘
+	│  Novelty Detection Method       │ ───┘
+	│      (e.g. IsolForest)          │ 
+	└─────────────────────────────────┘    
+
 
 At this point you should have many prediction files, such as::
 
@@ -405,7 +416,12 @@ Now we only have to:
 * use the classifier predictions
 * modify the prodictions by adding a prior, flattening them with an exponent
 
-To add a constant outlier probability of 10% to all objects, and add to each class a 1% probability
+To start, lets add a constant outlier probability of 10% to all objects, and add to each class a 1% probability, i.e. in pseudo-code::
+
+	class_i = class_i + 0.01 
+	class_99 = 0.1
+	normalise_classes()
+
 ::
 
 	$ PRIOR_STRENGTH=0.01 PRIOR_STRENGTH_OUTLIERS=0.1 EXPO=1 nice -n+20 python blend_outliers.py test_set.csv.gz_hyperpredictions-MLP.csv.gz
@@ -429,10 +445,17 @@ To add a constant outlier probability of 10% to all objects, and add to each cla
 	writing data to "test_set.csv.gz_hyperpredictions-MLP.csv.gz_blend_expo1.0prior0.01_outlierprior0.1.csv.gz"...
 
 
-Setting the exponent EXPO to 0.5 takes the square root of the classifier probabilities. This flattens the predictions, making them less sharp.
+Setting the exponent EXPO to 0.5 takes the square root of the classifier probabilities. This flattens the predictions, making them less sharp::
 
-But we want to insert novelty detections as class_99 results. For example, to give all those detected with the Isolation forest (at 0.1 false positive fraction) a outlier probability as strong as all the other classes combined (OUTLIER_CONF=1.0) and giving others a 1% class_99 probability
-::
+	class_i = class_i**EXPO + PRIOR_STRENGTH
+
+But we want to insert novelty detections as class_99 results. For example, to give all those detected with the Isolation forest (at 0.1 false positive fraction) a outlier probability as strong as all the other classes combined (OUTLIER_CONF=1.0) and giving others a 1% class_99 probability. i.e. in pseudo-code::
+
+	class_i = class_i + 0.01 
+	class_99 = 0.01 + (1.0 if IsolForest-detected else 0)
+	normalise_classes()
+
+To do this, we run::
 
 	$ PRIOR_STRENGTH=0.01 PRIOR_STRENGTH_OUTLIERS=0.01 EXPO=1 OUTLIER_CONF=1.0 OUTLIER_METHOD=SIMPLEMM-IsolForest-0.1 python blend_outliers.py test_set.csv.gz_hyperpredictions-MLP.csv.gz
 	loading prediction to correct, "test_set.csv.gz_hyperpredictions-MLP.csv.gz" ...
@@ -472,7 +495,8 @@ And look at the score:
 Open issues and Things that did not work
 -----------------------------------------
 
-The best score I received on kaggle is 1.790. I think there are some issues remaining, because 
+The best score I received on kaggle is 1.790. I am stuck at this barrier.
+I think there are some issues remaining, because 
 
 * Classifiers give *much, much better* scores on the training set than upon submission.
 * I get the best results when I apply flattening exponents of 0.1 and add high outlier and flat class probabilities (4%). This again means the classifiers are not as useful as they seem.
