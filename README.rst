@@ -222,7 +222,8 @@ Here is a sketch::
 
 
 For example::
-
+	
+	# for galactic:
 	$ METHOD=MLP python ../hyperpredictor.py RandomForest400 SIMPLEQTN-PCA40-SVC-default SIMPLEQTN-PCA40-MLP4 SIMPLEMM-PCA40-LDA
 	loading training_set.csv.gz_predictions_RandomForest400.csv.gz ...
 	loading test_set.csv.gz_predictions_RandomForest400.csv.gz ...
@@ -232,7 +233,7 @@ For example::
 	loading test_set.csv.gz_predictions_SIMPLEQTN-PCA40-MLP4.csv.gz ...
 	loading training_set.csv.gz_predictions_SIMPLEMM-PCA40-LDA.csv.gz ...
 	loading test_set.csv.gz_predictions_SIMPLEMM-PCA40-LDA.csv.gz ...
-	0.771 +- 0.121
+	0.771 +- 0.121  # <--- this is the log loss
 	training done after 59.6s
 	Confusion matrix:
 	       6   16   53   65   92
@@ -258,8 +259,61 @@ For example::
 	  predictions for unknown data...
 	    saving ...
 	predictions done after 155.5s
+	
+	# for extragalactic
+	$ METHOD=MLP python ../hyperpredictor.py RandomForest400 SIMPLEQTN-PCA40-SVC-default SIMPLEQTN-PCA40-MLP4 SIMPLEMM-PCA40-LDA
+	loading training_set.csv.gz_predictions_RandomForest400.csv.gz ...
+	loading test_set.csv.gz_predictions_RandomForest400.csv.gz ...
+	loading training_set.csv.gz_predictions_SIMPLEQTN-PCA40-SVC-default.csv.gz ...
+	loading test_set.csv.gz_predictions_SIMPLEQTN-PCA40-SVC-default.csv.gz ...
+	loading training_set.csv.gz_predictions_SIMPLEQTN-PCA40-MLP4.csv.gz ...
+	loading test_set.csv.gz_predictions_SIMPLEQTN-PCA40-MLP4.csv.gz ...
+	loading training_set.csv.gz_predictions_SIMPLEMM-PCA40-LDA.csv.gz ...
+	loading test_set.csv.gz_predictions_SIMPLEMM-PCA40-LDA.csv.gz ...
+	training MLP...
+	1.342 +- 0.202  # <--- this is the log loss
+	training done after 99.5s
+	Confusion matrix:
+	      15   42   52   62   64   67   88   90   95
+	 15  320   44    0   15    2    6    9   97    2
+	 42   56  543   73   86   16   11   14  386    8
+	 52    3   54   16   13    1    2    0   94    0
+	 62    7  108   26  153   17   31    0  142    0
+	 64    0    6    1    5   86    0    2    2    0
+	 67    2   15    4   30    3   53    0  101    0
+	 88   10    6    0    0    1    0  324   15   14
+	 90   60  123   17   38    4   19    7  2041    4
+	 95    1    6    2    0    0    0   17    9  140
+	Confusion matrix, normalised:
+	      15   42   52   62   64   67   88   90   95
+	 15   64    8    0    3    0    1    1   19    0
+	 42    4   45    6    7    1    0    1   32    0
+	 52    1   29    8    7    0    1    0   51    0
+	 62    1   22    5   31    3    6    0   29    0
+	 64    0    5    0    4   84    0    1    1    0
+	 67    0    7    1   14    1   25    0   48    0
+	 88    2    1    0    0    0    0   87    4    3
+	 90    2    5    0    1    0    0    0   88    0
+	 95    0    3    1    0    0    0    9    5   80
+	Confusion examples:
+	15 confused as 90: 97406,113669,133234,148996
+	42 confused as 90: 1632,2103,2300,3285
+	52 confused as 42: 64248,157746,209796,211331
+	52 confused as 90: 10757,11773,13138,14279
+	62 confused as 42: 62908,81252,140948,197559
+	62 confused as 90: 18645,26338,39846,49529
+	67 confused as 62: 3041,233697,276457,283066
+	67 confused as 90: 34437,60554,72385,77518
+	Predicting ...
+	  predictions for training data...
+	    saving ...
+	  predictions for unknown data...
+	    saving ...
+	predictions done after 423.1s
 
-The hyperpredictor often has a substantially better quality than any individual classifiers.
+
+The hyperpredictor often has a substantially better quality than any individual classifiers. 
+For example, in gal the 0.771 is better than 0.96 from RandomForest400 alone.
 
 
 5. Novelty detection
