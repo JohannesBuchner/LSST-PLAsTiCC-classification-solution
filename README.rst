@@ -572,7 +572,7 @@ This could be
 * Issue with my logloss scoring function -- but the random forest is trained independent of the scoring function
 * Issue with novelty detection (class_99). Definitely worth improving, submitting various approaches did not move the needle though. Looking at the detected cases, I did not find any obvious candidates for novel classes.
 * Issue with exgal/gal misclassifications. Maybe some galactic sources are in fact extragalactic?
-* Issue with redshifts. I applied some redshift resampling techniques, but it had no impact.
+* Issue with redshifts. I applied some redshift resampling techniques (see resample_training.py), but it had no good impact.
 * Issues with classifier accuracy. Most confusion remaining is
 
   * "x->y" means x is mistaken for y
