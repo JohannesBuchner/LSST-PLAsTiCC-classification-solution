@@ -203,8 +203,8 @@ train_knn.py runs:
 
 Both train_knn.py and train_randomforest.py report the quality of the prediction (lower loss is better) from K-fold cross-validation.
 
-4. Training a hyper-classifier
---------------------------------
+4. Training a meta classifier
+-------------------------------------------------
 
 Maybe one classifier does better in some parameter space region, but another does better in another parameter space region.
 So we want to combine the classifiers.
@@ -319,7 +319,7 @@ For example::
 	predictions done after 423.1s
 
 
-The hyperpredictor often has a substantially better quality than any individual classifiers. 
+The hyperpredictor (meta classifier) often has a substantially better quality than any individual classifiers. 
 For example, in gal the 0.771 is better than 0.96 from RandomForest400 alone.
 
 
