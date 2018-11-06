@@ -5,6 +5,10 @@ import numpy
 import scipy.stats
 import pandas
 from numpy import pi, exp, log10
+import itertools
+
+def runs_of_ones(bits):
+	return [sum(group) for bit, group in itertools.groupby(bits) if bit]
 
 c2 = numpy.polynomial.chebyshev.Chebyshev((0,0,1))
 def compute_concavity(x, y, yerr, ymodel):
@@ -313,14 +317,12 @@ columns = """
 Tflux_slope, Tflux_corr,
 redrise, redfall,
 bluerise, bluefall,
+blueconcrise, blueconcfall,
 phi_rise, theta_rise, evolrise,
-phi_rise_alt, theta_rise_alt, evolrise_alt,
 phi_fall, theta_fall, evolfall,
-phi_fall_alt, theta_fall_alt, evolfall_alt,
 Twave, flux400,
-Twave_alt, flux400_alt,
 Trise, Tfall, Tratio,
-Trise_alt, Tfall_alt, Tratio_alt
+nSEDpeaks, nSEDdips
 """
 header += columns.replace("\n", '').replace(" ","")
 print("header columns: %d" % header.count(','))
@@ -336,14 +338,10 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	
 	if specz == 0:
 		z = 0
-		z_alt = numpy.nan
 	elif numpy.isfinite(specz):
 		z = specz
-		z_alt = specz
 	else:
 		z = photoz
-		z_alt = sample_photoz(photoz, photoz_error, Nsamples=10)
-		z_alt = z_alt[numpy.argmax(numpy.abs(z_alt - photoz)/(z_alt + 1))]
 	
 	all_time = object_data['mjd'].values
 	all_flux = object_data['flux'].values
@@ -353,9 +351,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	lc_slope_features_all = []
 	
 	peakfluxes = []
-	peakfluxes_alt = []
 	peaktimes = []
-	peaktimes_alt = []
 
 	for passband in bands:
 		mask = numpy.logical_and(all_passband == passband, 
@@ -373,9 +369,6 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			peakflux, tpeak, lslope, rslope = LC_slope_singlefit(time, flux, flux_error, z)
 			peaktimes.append(tpeak)
 			peakfluxes.append([wavelengths[passband] / (1 + z), peakflux / passband_efficiencies[passband]])
-			peakflux, tpeak, lslope, rslope = LC_slope_singlefit(time, flux, flux_error, z_alt)
-			peaktimes_alt.append(tpeak)
-			peakfluxes_alt.append([wavelengths[passband] / (1 + z_alt), peakflux / passband_efficiencies[passband]])
 	
 	lc_slope_features_all = numpy.asarray(lc_slope_features_all)
 	peak_colors = lc_slope_features_all[:,-2] - lc_slope_features_all[:,-2].max()
@@ -385,38 +378,46 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 
 	if peaktimes:
 		tpeak_lo, tpeak_hi, tpeak = min(peaktimes), max(peaktimes), numpy.median(peaktimes)
-		tpeak_lo_alt, tpeak_hi_alt, tpeak_alt = min(peaktimes_alt), max(peaktimes_alt), numpy.median(peaktimes_alt)
 	else:
 		tpeak_lo, tpeak_hi, tpeak = None, None, all_time[all_flux.argmax()] / (1 + z)
-		tpeak_lo_alt, tpeak_hi_alt, tpeak_alt = None, None, all_time[all_flux.argmax()] / (1 + z_alt)
 	
 	lastt = -100
 	deltat = 0.1
 	blueratioseries = []
+	blueconcseries = []
 	redratioseries = []
+	dipseries = []
+	peakseries = []
 	Tseries = []
 	Trise = []
 	Tfall = []
 	Tflux = []
-	Tseries_alt = []
-	Trise_alt = []
-	Tfall_alt = []
-	Tflux_alt = []
 	for t in numpy.unique(all_time[numpy.logical_and(all_flux > 0, is_detected)]):
 		if t < lastt + deltat:
 			continue
 		lastt = t
 		mask = numpy.logical_and(numpy.logical_and(all_time >= t, all_time < t + deltat), 
 			numpy.logical_and(all_flux > 0, is_detected))
-		if (all_passband[mask] == 0).any() and (all_passband[mask] == 1).any():
-			blueratioseries.append([t, float(all_flux[mask][all_passband[mask] == 0].mean() / all_flux[mask][all_passband[mask] == 1].mean())])
-		if (all_passband[mask] == 4).any() and (all_passband[mask] == 5).any():
-			redratioseries.append([t, float(all_flux[mask][all_passband[mask] == 4].mean() / all_flux[mask][all_passband[mask] == 5].mean())])
+		flux = all_flux[mask]
+		passbands = all_passband[mask]
+		flux_error = all_flux_error[mask]
+		if (passbands == 0).any() and (passbands == 1).any():
+			blueratioseries.append([t, float(flux[passbands == 0].mean() / flux[passbands == 1].mean())])
+			# measure if the slope is concave or convex 
+			a = log10(flux[passbands == 0].mean() / passband_efficiencies[0])
+			b = log10(flux[passbands == 1].mean() / passband_efficiencies[1])
+			c = log10(flux[passbands == 2].mean() / passband_efficiencies[2])
+			la = log10(wavelengths[0])
+			lb = log10(wavelengths[1])
+			lc = log10(wavelengths[2])
+			bexpected = (lb - lc) / (la - lc) * (a - c) + c
+			blueconcseries.append([t, float(b - bexpected)])
+		if (passbands == 4).any() and (passbands == 5).any():
+			redratioseries.append([t, float(flux[passbands == 4].mean() / flux[passbands == 5].mean())])
 		
 		if mask.sum() > 3:
-			passband = all_passband[mask]
 			trest = t / (1 + z)
-			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
+			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passbands] / (1 + z), flux / flux.max() / passband_efficiencies[passbands])
 
 			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
 			Tflux.append([float(Twave), float(flux400)])
@@ -427,18 +428,19 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			if tpeak_hi is not None and trest > tpeak_hi:
 				Tfall.append(Twave)
 
-			trest_alt = t / (1 + z_alt)
-			Twave, s, slope, chi2diff = bbody_fit(wavelengths[passband] / (1 + z_alt), all_flux[mask] / all_flux[mask].max() / passband_efficiencies[passband])
-			
-			flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
-			Tflux_alt.append([Twave, flux400])
-			
-			Tseries_alt.append([trest_alt, Twave, slope, chi2diff])
-			if tpeak_lo_alt is not None and trest_alt < tpeak_lo_alt:
-				Trise_alt.append(Twave)
-			if tpeak_hi_alt is not None and trest_alt > tpeak_hi_alt:
-				Tfall_alt.append(Twave)
-	
+		# compute runs for number of peaks in the SED
+		order = numpy.argsort(passbands)
+		flux = flux[order] / passband_efficiencies[passbands][order]
+		flux_error = flux_error[order] / passband_efficiencies[passbands][order]
+		mask_left_down  = flux[1:-1] < flux[0:-2]
+		mask_right_up   = flux[1:-1] < flux[2:]
+		ndips = numpy.logical_and(mask_left_down, mask_right_up).sum()
+		dipseries.append(ndips)
+		mask_left_up    = flux[1:-1] > flux[0:-2]
+		mask_right_down = flux[1:-1] > flux[2:]
+		npeaks = numpy.logical_and(mask_left_up, mask_right_down).sum()
+		peakseries.append(npeaks)
+
 	if len(Tflux) > 3:
 		Tflux = numpy.array(Tflux)
 		slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(log10(Tflux[:,0] / 4000), log10(Tflux[:,1]))
@@ -457,7 +459,10 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		tblue, blueratio = numpy.transpose(blueratioseries)
 		bluerise, bluefall = numpy.mean(blueratio[tblue < tpeak]), numpy.mean(blueratio[tblue > tpeak])
 		features += [bluerise, bluefall]
+		blueconcrise, blueconcfall = numpy.mean(numpy.array(blueconcseries)[tblue < tpeak]), numpy.mean(numpy.array(blueconcseries)[tblue > tpeak])
+		features += [blueconcrise, blueconcfall]
 	else:
+		features += [numpy.nan, numpy.nan]
 		features += [numpy.nan, numpy.nan]
 	
 	# find eigenvectors of log(t_rest), log(wave), log(flux) surface
@@ -473,18 +478,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	else:
 		phi_rise, theta_rise, evolrise = numpy.nan, numpy.nan, numpy.nan
 	
-	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z_alt) < tpeak)
-	if mask.sum() > 6 and numpy.isfinite(z_alt):
-		passbands = all_passband[mask]
-		phi_rise, theta_rise, evolrise_alt = fit_logplanetilt(all_time[mask] - all_time[mask].max() / (1 + z_alt), 
-			log10(wavelengths[passbands] / (1 + z_alt) / 300),
-			log10(all_flux[mask] / passband_efficiencies[passbands]))
-		phi_rise_alt, theta_rise_alt = fit_logplane(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
-			log10(wavelengths[passbands] / (1 + z_alt) / 300),
-			log10(all_flux[mask] / passband_efficiencies[passbands]))
-	else:
-		phi_rise_alt, theta_rise_alt, evolrise_alt = numpy.nan, numpy.nan, numpy.nan
-	features += [phi_rise, theta_rise, evolrise, phi_rise_alt, theta_rise_alt, evolrise_alt]
+	features += [phi_rise, theta_rise, evolrise]
 
 	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z) > tpeak)
 	if mask.sum() > 6:
@@ -497,19 +491,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 			log10(all_flux[mask] / passband_efficiencies[passbands]))
 	else:
 		phi_fall, theta_fall, evolfall = numpy.nan, numpy.nan, numpy.nan
-	
-	mask = numpy.logical_and(numpy.logical_and(all_flux > 0, is_detected), all_time / (1+z_alt) > tpeak)
-	if mask.sum() > 6 and numpy.isfinite(z_alt):
-		passbands = all_passband[mask]
-		phi_fall, theta_fall, evolfall_alt = fit_logplanetilt(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
-			log10(wavelengths[passbands] / (1 + z_alt) / 300),
-			log10(all_flux[mask] / passband_efficiencies[passbands]))
-		phi_fall_alt, theta_fall_alt = fit_logplane(all_time[mask] - all_time[mask].min() / (1 + z_alt), 
-			log10(wavelengths[passbands] / (1 + z_alt) / 300),
-			log10(all_flux[mask] / passband_efficiencies[passbands]))
-	else:
-		phi_fall_alt, theta_fall_alt, evolfall_alt = numpy.nan, numpy.nan, numpy.nan
-	features += [phi_fall, theta_fall, evolfall, phi_fall_alt, theta_fall_alt, evolfall_alt]
+	features += [phi_fall, theta_fall, evolfall]
 
 	# plot 
 	if len(peakfluxes) > 2:
@@ -517,13 +499,7 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 		Twave, s, slope, chi2diff = bbody_fit(peakfluxes[:,0], peakfluxes[:,1] / numpy.nanmax(peakfluxes[:,1]))
 		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
 		features += [Twave, flux400]
-		
-		peakfluxes_alt = numpy.asarray(peakfluxes_alt)
-		Twave, s, slope, chi2diff = bbody_fit(peakfluxes_alt[:,0], peakfluxes_alt[:,1] / numpy.nanmax(peakfluxes_alt[:,1]))
-		flux400 = s * Twave**-5 / (numpy.exp(1/(wavenorm/Twave)) - 1)
-		features += [Twave, flux400]
 	else:
-		features += [numpy.nan, numpy.nan]
 		features += [numpy.nan, numpy.nan]
 	
 	# measure rising and falling fluxes
@@ -531,10 +507,13 @@ for object_id, object_data in e.groupby(e.index.get_level_values(0)):
 	Tfall = numpy.median(Tfall)
 	Tratio = log10(Trise / Tfall)
 	features += [Trise, Tfall, Tratio]
-	Trise_alt = numpy.median(Trise_alt)
-	Tfall_alt = numpy.median(Tfall_alt)
-	Tratio_alt = log10(Trise_alt / Tfall_alt)
-	features += [Trise_alt, Tfall_alt, Tratio_alt]
+	
+	# measure whether the SED has peaks and dips
+	if len(peakseries) > 0:
+		features += [numpy.max(peakseries), numpy.max(dipseries)]
+	else:
+		features += [0, 0]
+	
 	#print("   ",len(features))
 	fout.write(linefmt % tuple(features))
 

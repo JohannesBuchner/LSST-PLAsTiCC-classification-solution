@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 from alltrain import *
 
-train_columns = list(train.columns)
+train_columns = list(train.columns[valid_column_mask])
 del train
 
 # for random forests the transformation should not matter.
@@ -75,6 +75,80 @@ def train_and_evaluate(name, clf):
 		print('predictions done after %.1fs' % (time() - t0))
 	return clf
 
+
+if os.environ.get('VIZ', '0') == '1':
+	from yellowbrick.features import Rank1D, Rank2D, RadViz, ParallelCoordinates
+	import matplotlib.pyplot as plt
+	print("Rank1D...")
+	features = train_columns
+	visualizer = Rank1D(features=features, algorithm='shapiro')
+	visualizer.fit(X, Y)                # Fit the data to the visualizer
+	visualizer.transform(X)             # Transform the data
+	visualizer.poof(outpath='viz_feature_rank1d.pdf', bbox_inches='tight')
+	plt.close('all')
+	feature_diversity = visualizer.ranks_
+	# Instantiate the visualizer with the Covariance ranking algorithm
+	print("Rank2D...")
+	visualizer = Rank2D(features=features, algorithm='spearman')
+	visualizer.fit(X, Y)                # Fit the data to the visualizer
+	visualizer.transform(X)             # Transform the data
+	visualizer.poof(outpath='viz_feature_rank2d.pdf', bbox_inches='tight')
+	plt.close('all')
+	
+	"""
+	# reorder the features so similar ones are together
+	features_to_handle = list(range(len(features)))
+	print(features_to_handle)
+	features_ordered = []
+	last_feature = 0
+	numpy.random.seed(1)
+	while features_to_handle:
+		print("%d ..." % last_feature, feature_distance.shape)
+		invdists = 1. / (visualizer.ranks_[last_feature,features_to_handle]**2 + 1e-5)
+		invdists /= invdists.sum()
+		i = numpy.random.choice(range(len(features_to_handle)), p=invdists)
+		a = features_to_handle.pop(i)
+		features_ordered.append(a)
+		last_feature = a
+	print(features_ordered)
+	print(len(features))
+	features = [train_columns[i] for i in features_ordered]
+	print(features)
+	print(len(features))
+	XT = X[:,numpy.asarray(features_ordered)]
+	print(X.shape, XT.shape, Y.shape)
+	"""
+	numpy.random.seed(1)
+	XT = numpy.arange(1000).reshape((-1,2))
+	YT = numpy.random.randint(6, size=len(XT))*10
+	print(XT.shape, XT.dtype, YT.shape, YT.dtype)
+	
+	visualizer = RadViz(classes = [0,10,20,30,40,50])
+	visualizer.fit_transform(XT, YT)
+	visualizer.poof(outpath='viz_feature_radviz.pdf', bbox_inches='tight')
+	plt.close('all')
+	
+	visualizer = ParallelCoordinates(classes = [0,10,20,30,40,50],
+		sample=0.05, shuffle=True, fast=True)
+	visualizer.fit_transform(XT, YT)
+	visualizer.poof(outpath='viz_feature_parallel_coords.pdf', bbox_inches='tight')
+	plt.close('all')
+	XT = X
+	YT = Y
+	
+	print(XT.shape, XT.dtype, YT.shape, YT.dtype)
+	visualizer = RadViz(classes=labels)
+	visualizer.fit_transform(XT, YT)
+	visualizer.poof(outpath='viz_feature_radviz.pdf', bbox_inches='tight')
+	plt.close('all')
+	
+	
+	visualizer = ParallelCoordinates(classes=labels, sample=0.05, shuffle=True, fast=True)
+	visualizer.fit_transform(XT, YT)
+	visualizer.poof(outpath='viz_feature_parallel_coords.pdf', bbox_inches='tight')
+	plt.close('all')
+	sys.exit(0)
+	clf = RandomForestClassifier(n_estimators=400, class_weight=class_weights)
 
 if os.environ.get('FIND_FEATURE_SUBSET', '0') == '1':
 	clf = RandomForestClassifier(n_estimators=100, class_weight=class_weights)

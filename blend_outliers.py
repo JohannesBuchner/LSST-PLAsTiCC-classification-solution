@@ -49,7 +49,7 @@ for col in df.columns[1:]:
 		predictor = total_probs * outlier_votes * outlier_confidence
 		w_prior = w_outliers
 		
-		col_prob = predictor + w_prior
+		col_prob = df.loc[:,col] + predictor + w_prior
 	else:
 		w_prior = w
 		predictor = df.loc[:,col]**expo

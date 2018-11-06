@@ -173,6 +173,15 @@ def plasticc_log_loss(truth, prediction, custom_class_weights=1., eps=1e-15, nor
 
 	return logloss
 
+from sklearn.metrics.classification import _weighted_sum
+def my_log_loss(y_true, y_pred, eps=1e-15, normalize=True, labels=None, encoder=None, weights_targets=None):
+	transformed_labels = encoder.transform(y_true)
+	y_pred = numpy.clip(y_pred, eps, 1 - eps)
+	y_pred /= y_pred.sum(axis=1)[:, numpy.newaxis]
+	
+	sample_weight = weights_targets[y_true]
+	loss = (transformed_labels * numpy.log(y_pred)).sum(axis=1)
+	return _weighted_sum(loss, sample_weight, normalize)
 
 if __name__ == '__main__':
 	K = 12

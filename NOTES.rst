@@ -86,15 +86,24 @@ galactic:
 92:
 
 
-TODO
------
+Reducing confusion
+-------------------
 
-* Merge results
-* Try also again resampled
-* Try again gal-dip gal-nodip exgal 
-* Redo feature subsets
-* Submit: {SVM,RandomForest400}-{normal,resampled} (outliers: 0.1, no flattening, prior=1%)
-* Submit: NaiveBayes-normal
+42, 52, 62:
+	52 have late blue excess
+	52 has very round SEDs (one peak, no dip)
+	late 62 has a perfectly powerlaw SED except for the IR
+	early 62 has multiple peaks
+	late 42 has a perfectly powerlaw SED except for the IR
+	early 42 has single peak
+	
+	-> count number of peaks, dips in SED in late and early phase
+
+90 vs 15, 42
+	SED of 90 has steeper slope in 400nm than expected
+	-> ratio of u/g and g/r
+	late can have dips
+
 
 Machine learning
 -------------------
