@@ -69,15 +69,18 @@ To create feature files for the training set, run::
 	$ python make_SED_features.py training_set
 	$ SEDTRANSFORMER=1 python make_SED_features.py training_set
 
-The first computes some basic features for each photometric band:
+The first (make_std_features.py) computes some basic features for each photometric band:
 
-* median, variance, skew, kurtosis, iqr of "magnitudes" (just log-fluxes really) 
 * Shapiro_wilk statistic, Lomb-Scargle amplitude ratios and dominant frequency
-* median, variance, skew, kurtosis, iqr of time
+* median, variance, skew, kurtosis, iqr of 
+  * time
+  * time differences
+  * log-fluxes
+  * slope between points (d log(flux) / dt)
 * number of dips and peaks in the lightcurve
 * length and variance of runs (how often the lightcurve consecutively goes up/down)
 
-The second computes some custom features. (Below, fitting is done with linear regression on rest-frame information)
+The second (make_2dslope_features.py) computes some custom features. (Below, fitting is done with linear regression on rest-frame information)
 
 * for each photometric band:
 
@@ -107,11 +110,11 @@ The second computes some custom features. (Below, fitting is done with linear re
 * compute median black body temperature of data before peak
 * compute median black body temperature of data after peak
 
-The third simply extracts all SEDs with their photo-z and target class.
-The forth uses train_SED.py to train a simple neural network to give target class probabilities simply from the SEDs. Because each object can have multiple SEDs,
-these are combined by taking the maximum across each classification.
+The third (make_SED_features.py) simply extracts all SEDs with their photo-z and target class.
+The forth uses train_SED.py to train a simple neural network to give target class probabilities simply from the SEDs. 
+Because each object can have multiple SEDs, these are combined by taking the maximum across each classification.
 
-Before using make_2dslope_features.py, I created make_slopecolor_features.py.
+Before switching to make_2dslope_features.py, I created make_slope_features.py.
 It performs bootstrapped least square line fits to get rise and fall slopes, peak fluxes and SED evolution over time.
 This is done for each photometric band. The colors at the peaks are also computed.
 
@@ -140,6 +143,10 @@ Conveniently, you just need:
 	$ make -j {gal,exgal}/{training_set,test_set}.csv.gz
 
 Which merges the data files together and creates the necessary links.
+
+This is neat because I can edit/add a feature script and rerun only one 
+of the analyses, without needing to rerun everything.
+
 
 3. Training models
 -----------------------------------------------
