@@ -483,11 +483,13 @@ To do this, we run::
 7. Submitting to Kaggle
 -----------------------------
 
-Finally, we are ready to submit a result file.
+Finally, we are ready to submit a result file::
 
 	$ kaggle competitions submit -c PLAsTiCC-2018 -f test_set.csv.gz_hyperpredictions-MLP.csv.gz_blend_expo1.0prior0.01_SIMPLEMM-IsolForest-0.1outlierconf1.0prior0.01.csv.gz -m 'my submission'
+	$ # (the above needs:) 
+	$ # pip install kaggle --user
 
-And look at the score:
+And look at the score::
 
 	$ kaggle competitions submissions -c PLAsTiCC-2018|head -n3
 
