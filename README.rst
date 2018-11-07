@@ -127,7 +127,7 @@ The test data are fairly large, so we parallelise here.
 
 First we split test_set.csv into 32 chunks::
 
-	$ bash split.sh test_set
+	$ bash split.sh
 
 This will make a chunks/ folder with 32 files such as chunks/test_set_chuns1.csv, chunks/test_set_chuns2.csv, ...
 
